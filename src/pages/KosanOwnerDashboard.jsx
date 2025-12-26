@@ -582,7 +582,7 @@ const KosanOwnerDashboard = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
           <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Memuat data dashboard kosan...</p>
+          <p className="text-gray-600">Memuat data dashboard mitra...</p>
         </div>
       </div>
     );

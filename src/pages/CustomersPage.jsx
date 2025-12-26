@@ -34,6 +34,17 @@ const CustomersPage = () => {
     }
   }, [kosanId]); // Tambahkan kosanId sebagai dependency
 
+  const slugify = (text) => {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')       // spasi → -
+    .replace(/[^\w\-]+/g, '')   // hapus karakter aneh
+    .replace(/\-\-+/g, '-');    // -- → -
+};
+
+
   const loadDokuScript = () => {
     if (window.loadJokulCheckout || document.querySelector('script[src*="jokul-checkout"]')) {
       console.log('✅ DOKU Checkout script already loaded');
@@ -594,7 +605,7 @@ const CustomersPage = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
                         <Link
-                          to={`/customer/${customer.id}`}
+                          to={`/customer/${customer.id}-${slugify(customer.name)}`}
                           className="text-blue-600 hover:text-blue-900 px-3 py-1 border border-blue-200 rounded-lg hover:bg-blue-50 transition"
                         >
                           Detail
