@@ -471,7 +471,7 @@ const CustomerDashboard = () => {
       setPaymentSuccess(false);
 
       const customerName = customerData?.data?.customer?.name || 'Pelanggan';
-      const customerEmail = `${customerName.toLowerCase().replace(/\s+/g, '.')}@example.com`;
+      const customerEmail = `andibarmawi@gmail.com`;
       const customerPhone = '08123456789';
       const customerId = customerData?.data?.customer?.id || 'UNKNOWN';
 

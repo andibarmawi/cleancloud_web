@@ -147,7 +147,7 @@ const handlePayment = async () => {
         customer: {
           id: `USER-${invoiceData.data.invoice.consumer_id}`,
           name: invoiceData.data.invoice.customer_name,
-          email: `${invoiceData.data.invoice.customer_name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+          email: `andibarmawi@gmail.com`,
           phone: '08123456789'
         },
         additional_info: {
