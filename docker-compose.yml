@@ -1,10 +1,7 @@
-version: "3.9"
-
 services:
   web:
     build: .
     container_name: cleancloud-web
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:5173:80"  # localhost only, port 5173
     restart: unless-stopped
