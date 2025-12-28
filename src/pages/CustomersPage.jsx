@@ -74,7 +74,7 @@ const CustomersPage = () => {
       setError(null);
       
       // Gunakan kosanId dari useParams
-      //const response = await fetch(`http://localhost:8080/public/kosan/${kosanId}`);
+     
       const response = await fetch(buildApiUrl(`/public/kosan/${kosanId}`));
       
       if (!response.ok) {
