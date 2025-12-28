@@ -23,6 +23,7 @@ import {
   FaWhatsapp 
 } from 'react-icons/fa';
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import { buildApiUrl } from "../apiConfig";
 
 const CustomerDashboard = () => {
   const { customerId } = useParams();
@@ -70,6 +71,49 @@ const CustomerDashboard = () => {
     }
   }, [customerId]);
 
+  const getProcessingStatusBadge = useCallback((status) => {
+  if (!status) return null;
+
+  const statusConfig = {
+    'SELESAI': { 
+      color: 'bg-green-100 text-green-800', 
+      icon: <FaCheckCircle className="mr-1" />,
+      text: 'SELESAI'
+    },
+    'DALAM PROSES': { 
+      color: 'bg-blue-100 text-blue-800', 
+      icon: <FaSpinner className="animate-spin mr-1" />,
+      text: 'DALAM PROSES'
+    },
+    'MENUNGGU': { 
+      color: 'bg-yellow-100 text-yellow-800', 
+      icon: <FaClock className="mr-1" />,
+      text: 'MENUNGGU'
+    },
+    'DIAMBIL': { 
+      color: 'bg-purple-100 text-purple-800', 
+      icon: <FaTshirt className="mr-1" />,
+      text: 'DIAMBIL'
+    },
+    'BATAL': { 
+      color: 'bg-red-100 text-red-800', 
+      icon: <FaExclamationCircle className="mr-1" />,
+      text: 'BATAL'
+    }
+  };
+  
+  const config = statusConfig[status] || { 
+    color: 'bg-gray-100 text-gray-800', 
+    icon: <FaClock className="mr-1" />,
+    text: status 
+  };
+  
+  return (
+    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
+      {config.icon} {config.text}
+    </span>
+  );
+}, []);
   const openWhatsApp = useCallback(() => {
     if (!customerData?.data?.laundry?.phone) {
       alert('Nomor telepon laundry tidak tersedia.');
@@ -112,7 +156,7 @@ const CustomerDashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`http://localhost:8080/public/1/customers/${customerId}`);
+      const response = await fetch(buildApiUrl(`/public/1/customers/${customerId}`));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -456,7 +500,8 @@ const CustomerDashboard = () => {
       console.log('📋 [PAYMENT] Payment Type:', isBulkPayment ? 'BULK PAYMENT' : 'SINGLE PAYMENT');
       console.log('💰 [PAYMENT] Amount:', formatCurrency(amount));
       
-      const endpointUrl = 'http://localhost:8080/doku/payment';
+      const endpointUrl = buildApiUrl('/doku/payment');
+
       console.log('🔗 [PAYMENT] Endpoint URL:', endpointUrl);
 
       const response = await fetch(endpointUrl, {
@@ -591,6 +636,9 @@ const CustomerDashboard = () => {
       if (filterStatus === 'ALL') return true;
       if (filterStatus === 'UNPAID') return invoice.status === 'UNPAID';
       if (filterStatus === 'NOT_PICKED') return invoice.pickup_status === 'BELUM DIAMBIL';
+      if (filterStatus === 'SELESAI') return invoice.status_pengerjaan === 'SELESAI';
+      if (filterStatus === 'DALAM PROSES') return invoice.status_pengerjaan === 'DALAM PROSES';
+      if (filterStatus === 'MENUNGGU') return invoice.status_pengerjaan === 'MENUNGGU';
       return invoice.status === filterStatus;
     })
     ?.sort((a, b) => {
@@ -1087,6 +1135,9 @@ const CustomerDashboard = () => {
                   <option value="ALL">Semua Status</option>
                   <option value="UNPAID">Belum Lunas</option>
                   <option value="NOT_PICKED">Belum Diambil</option>
+                  <option value="SELESAI">Selesai Diproses</option>
+                  <option value="DALAM PROSES">Dalam Proses</option>
+                  <option value="MENUNGGU">Menunggu</option>
                   <option value="READY">Siap Diambil</option>
                   <option value="PROCESSING">Sedang Diproses</option>
                   <option value="PAID">Sudah Lunas</option>
@@ -1194,18 +1245,26 @@ const CustomerDashboard = () => {
                       </div>
                       
                       {/* Status Details */}
-                      <div className="ml-16 flex flex-wrap gap-3">
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-600 mr-2">Status Pembayaran:</span>
-                          <span className={`text-sm font-medium ${
-                            invoice.payment_status === 'LUNAS' ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {invoice.payment_status || 'Tidak diketahui'}
-                          </span>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-600 mr-2">Status Pengambilan:</span>
-                          {getPickupStatusBadge(invoice.pickup_status)}
+                      <div className="ml-16">
+                        <div className="flex flex-wrap gap-4 mb-3">
+                          <div className="flex flex-col">
+                            <span className="text-xs text-gray-500 mb-1">Status Pembayaran</span>
+                            <span className={`text-sm font-medium ${
+                              invoice.payment_status === 'LUNAS' ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {invoice.payment_status || 'Tidak diketahui'}
+                            </span>
+                          </div>
+                          
+                          <div className="flex flex-col">
+                            <span className="text-xs text-gray-500 mb-1">Status Pengambilan</span>
+                            {getPickupStatusBadge(invoice.pickup_status)}
+                          </div>
+                          
+                          <div className="flex flex-col">
+                            <span className="text-xs text-gray-500 mb-1">Status Pengerjaan</span>
+                            {getProcessingStatusBadge(invoice.status_pengerjaan)}
+                          </div>
                         </div>
                       </div>
                     </div>

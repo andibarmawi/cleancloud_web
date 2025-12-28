@@ -13,6 +13,7 @@ import {
   FaSync  
 } from 'react-icons/fa';
 import { Link, useParams } from 'react-router-dom';
+import { buildApiUrl } from "../apiConfig";
 
 const CustomersPage = () => {
   const { kosanId } = useParams(); // Ambil kosanId dari URL
@@ -39,10 +40,11 @@ const CustomersPage = () => {
     .toString()
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-')       // spasi → -
-    .replace(/[^\w\-]+/g, '')   // hapus karakter aneh
-    .replace(/\-\-+/g, '-');    // -- → -
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-()]+/g, '') // ✅ izinkan ()
+    .replace(/--+/g, '-');
 };
+
 
 
   const loadDokuScript = () => {
@@ -72,7 +74,8 @@ const CustomersPage = () => {
       setError(null);
       
       // Gunakan kosanId dari useParams
-      const response = await fetch(`http://localhost:8080/public/kosan/${kosanId}`);
+      //const response = await fetch(`http://localhost:8080/public/kosan/${kosanId}`);
+      const response = await fetch(buildApiUrl(`/public/kosan/${kosanId}`));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -150,6 +153,8 @@ const CustomersPage = () => {
       }
     });
 
+    
+
   const handlePayment = async (customer) => {
     try {
       setPaymentLoading(true);
@@ -165,7 +170,7 @@ const CustomersPage = () => {
         customer: {
           id: `USER-${customer.id}`,
           name: customer.name,
-          email: `${customer.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+          email: `andibarmawi@gmail.com`,
           phone: customer.phone || '08123456789'
         },
         additional_info: {
@@ -179,7 +184,7 @@ const CustomersPage = () => {
 
       console.log('🔄 [PAYMENT] Sending payment data:', paymentData);
       
-      const endpointUrl = 'http://localhost:8080/doku/payment';
+      const endpointUrl = buildApiUrl('/doku/payment');
       console.log('🔗 [PAYMENT] Endpoint URL:', endpointUrl);
       
       const response = await fetch(endpointUrl, {

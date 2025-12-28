@@ -21,9 +21,11 @@ import {
   FaFire,
   FaBell,
   FaCaretDown,
-  FaCaretUp
+  FaCaretUp,
+  FaTimes
 } from 'react-icons/fa';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { buildApiUrl } from '../apiConfig';
 
 const InvoicePage = () => {
   const [searchParams] = useSearchParams();
@@ -36,6 +38,14 @@ const InvoicePage = () => {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [expandedTrackingItems, setExpandedTrackingItems] = useState({});
+  
+  // State untuk error handling
+  const [errorModal, setErrorModal] = useState({
+    show: false,
+    title: '',
+    message: '',
+    details: ''
+  });
 
   useEffect(() => {
     fetchInvoiceData();
@@ -50,349 +60,54 @@ const InvoicePage = () => {
   };
 
   const WhatsAppButton = ({ phone, invoice, laundryName }) => {
-  if (!phone) return null;
+    if (!phone) return null;
 
-  const url = `https://wa.me/${phone.replace(/^0/, "62")}?text=${encodeURIComponent(
-    `Halo ${laundryName} 👋 Saya ingin menanyakan invoice ${invoice}`
-  )}`;
+    const url = `https://wa.me/${phone.replace(/^0/, "62")}?text=${encodeURIComponent(
+      `Halo ${laundryName} 👋 Saya ingin menanyakan invoice ${invoice}`
+    )}`;
 
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
-    >
-      <FaWhatsapp />
-      WhatsApp
-    </a>
-  );
-};
-
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+      >
+        <FaWhatsapp />
+        WhatsApp
+      </a>
+    );
+  };
 
   const fetchInvoiceData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8080/public/31/pay/invoice?invoice=${invoiceNumber}`);
+      const response = await fetch(buildApiUrl(`/public/31/pay/invoice?invoice=${invoiceNumber}`));
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (!data.success) {
-        throw new Error('API Error');
+        throw new Error(data.message || 'API Error');
       }
       
       setInvoiceData(data);
     } catch (error) {
-      console.log('Using mock data:', error);
-      // Mock data dengan multiple items dan tracking history per item
-      setInvoiceData({
-        success: true,
-        message: "Data invoice berhasil dimuat",
-        data: {
-          status: true,
-          invoice: {
-            invoice_number: "INV-001",
-            customer_name: "Andi",
-            customer_phone: "08123456789",
-            laundry: {
-              id: 1,
-              name: "Clean Cloud Laundry",
-              address: "Jl. Kemerdekaan No. 45, Jakarta",
-              phone: "(021) 1234567",
-              whatsapp: "628123456789"
-            },
-            total: 25650,
-            status: "UNPAID",
-            estimated_finished: "Rabu, 11 Desember 2025",
-            pickup_status: "BELUM DIAMBIL",
-            payment_status: "BELUM LUNAS",
-            created_at: "Senin, 9 Desember 2025",
-            due_date: "Jumat, 13 Desember 2025",
-            items: [
-              {
-                id: 1,
-                service_name: "Regular 3 hari",
-                unit: "kg",
-                quantity: 3,
-                price: 7000,
-                subtotal: 21000,
-                work_status: "SORTIR",
-                work_status_progress: 25,
-                tracking_history: [
-                  {
-                    status: "ORDER_RECEIVED",
-                    title: "Pesanan Diterima",
-                    description: "Pakaian Regular 3 hari telah diterima",
-                    timestamp: "09 Des 2025, 10:30",
-                    completed: true
-                  },
-                  {
-                    status: "SORTING",
-                    title: "Proses Sortir",
-                    description: "Pakaian sedang disortir",
-                    timestamp: "09 Des 2025, 11:15",
-                    completed: true
-                  },
-                  {
-                    status: "WASHING",
-                    title: "Proses Mencuci",
-                    description: "Sedang dicuci dengan detergen standar",
-                    timestamp: "09 Des 2025, 14:00",
-                    completed: false,
-                    current: true
-                  },
-                  {
-                    status: "DRYING",
-                    title: "Proses Pengeringan",
-                    description: "Akan dikeringkan",
-                    timestamp: "Estimasi: 10 Des 2025, 09:00",
-                    completed: false
-                  },
-                  {
-                    status: "IRONING",
-                    title: "Proses Setrika",
-                    description: "Akan disetrika",
-                    timestamp: "Estimasi: 10 Des 2025, 13:00",
-                    completed: false
-                  },
-                  {
-                    status: "READY_FOR_PICKUP",
-                    title: "Siap Diambil",
-                    description: "Siap diambil di laundry",
-                    timestamp: "Estimasi: 11 Des 2025, 10:00",
-                    completed: false
-                  }
-                ]
-              },
-              {
-                id: 2,
-                service_name: "Express 1 hari",
-                unit: "pcs",
-                quantity: 2,
-                price: 1500,
-                subtotal: 3000,
-                work_status: "CUCI",
-                work_status_progress: 50,
-                tracking_history: [
-                  {
-                    status: "ORDER_RECEIVED",
-                    title: "Pesanan Diterima",
-                    description: "Pakaian Express telah diterima",
-                    timestamp: "09 Des 2025, 10:35",
-                    completed: true
-                  },
-                  {
-                    status: "SORTING",
-                    title: "Proses Sortir",
-                    description: "Pakaian sedang disortir",
-                    timestamp: "09 Des 2025, 11:30",
-                    completed: true
-                  },
-                  {
-                    status: "WASHING",
-                    title: "Proses Mencuci",
-                    description: "Sedang dicuci dengan cepat",
-                    timestamp: "09 Des 2025, 13:00",
-                    completed: true
-                  },
-                  {
-                    status: "DRYING",
-                    title: "Proses Pengeringan",
-                    description: "Sedang dikeringkan cepat",
-                    timestamp: "09 Des 2025, 15:30",
-                    completed: false,
-                    current: true
-                  },
-                  {
-                    status: "IRONING",
-                    title: "Proses Setrika",
-                    description: "Akan segera disetrika",
-                    timestamp: "Estimasi: 09 Des 2025, 17:00",
-                    completed: false
-                  },
-                  {
-                    status: "READY_FOR_PICKUP",
-                    title: "Siap Diambil",
-                    description: "Siap diambil hari ini",
-                    timestamp: "Estimasi: 09 Des 2025, 18:00",
-                    completed: false
-                  }
-                ]
-              },
-              {
-                id: 3,
-                service_name: "Setrika",
-                unit: "kg",
-                quantity: 1.5,
-                price: 1000,
-                subtotal: 1500,
-                work_status: "SETRIKA",
-                work_status_progress: 75,
-                tracking_history: [
-                  {
-                    status: "ORDER_RECEIVED",
-                    title: "Pesanan Diterima",
-                    description: "Pakaian untuk setrika telah diterima",
-                    timestamp: "09 Des 2025, 10:40",
-                    completed: true
-                  },
-                  {
-                    status: "SORTING",
-                    title: "Proses Sortir",
-                    description: "Disortir untuk setrika",
-                    timestamp: "09 Des 2025, 11:45",
-                    completed: true
-                  },
-                  {
-                    status: "WASHING",
-                    title: "Tidak Perlu Cuci",
-                    description: "Langsung ke proses setrika",
-                    timestamp: "09 Des 2025, 12:00",
-                    completed: true,
-                    skipped: true
-                  },
-                  {
-                    status: "DRYING",
-                    title: "Tidak Perlu Kering",
-                    description: "Langsung ke proses setrika",
-                    timestamp: "09 Des 2025, 12:00",
-                    completed: true,
-                    skipped: true
-                  },
-                  {
-                    status: "IRONING",
-                    title: "Proses Setrika",
-                    description: "Sedang disetrika rapi",
-                    timestamp: "09 Des 2025, 14:30",
-                    completed: false,
-                    current: true
-                  },
-                  {
-                    status: "READY_FOR_PICKUP",
-                    title: "Siap Diambil",
-                    description: "Akan siap hari ini",
-                    timestamp: "Estimasi: 09 Des 2025, 16:00",
-                    completed: false
-                  }
-                ]
-              },
-              {
-                id: 4,
-                service_name: "Dry Cleaning",
-                unit: "pcs",
-                quantity: 1,
-                price: 25000,
-                subtotal: 25000,
-                work_status: "SELESAI",
-                work_status_progress: 100,
-                tracking_history: [
-                  {
-                    status: "ORDER_RECEIVED",
-                    title: "Pesanan Diterima",
-                    description: "Dry cleaning diterima",
-                    timestamp: "08 Des 2025, 09:00",
-                    completed: true
-                  },
-                  {
-                    status: "SORTING",
-                    title: "Pemeriksaan Khusus",
-                    description: "Pemeriksaan bahan khusus",
-                    timestamp: "08 Des 2025, 10:00",
-                    completed: true
-                  },
-                  {
-                    status: "CLEANING",
-                    title: "Dry Cleaning",
-                    description: "Proses dry cleaning khusus",
-                    timestamp: "08 Des 2025, 14:00",
-                    completed: true
-                  },
-                  {
-                    status: "DRYING",
-                    title: "Pengeringan Khusus",
-                    description: "Pengeringan dengan suhu khusus",
-                    timestamp: "09 Des 2025, 09:00",
-                    completed: true
-                  },
-                  {
-                    status: "IRONING",
-                    title: "Setrika Khusus",
-                    description: "Setrika dengan teknik khusus",
-                    timestamp: "09 Des 2025, 11:00",
-                    completed: true
-                  },
-                  {
-                    status: "PACKAGING",
-                    title: "Packing Premium",
-                    description: "Dikemas dengan plastik premium",
-                    timestamp: "09 Des 2025, 12:00",
-                    completed: true
-                  },
-                  {
-                    status: "READY_FOR_PICKUP",
-                    title: "Siap Diambil",
-                    description: "Sudah siap diambil",
-                    timestamp: "09 Des 2025, 12:30",
-                    completed: true,
-                    current: true
-                  }
-                ]
-              },
-              {
-                id: 5,
-                service_name: "Detergen Premium",
-                unit: "pcs",
-                quantity: 1,
-                price: 150,
-                subtotal: 150,
-                work_status: "PACKING",
-                work_status_progress: 90,
-                tracking_history: [
-                  {
-                    status: "ORDER_RECEIVED",
-                    title: "Pesanan Diterima",
-                    description: "Detergen premium dipesan",
-                    timestamp: "09 Des 2025, 10:45",
-                    completed: true
-                  },
-                  {
-                    status: "PROCESSING",
-                    title: "Pemrosesan",
-                    description: "Produk dipersiapkan",
-                    timestamp: "09 Des 2025, 11:00",
-                    completed: true
-                  },
-                  {
-                    status: "PACKAGING",
-                    title: "Packing",
-                    description: "Sedang dikemas",
-                    timestamp: "09 Des 2025, 15:00",
-                    completed: false,
-                    current: true
-                  },
-                  {
-                    status: "READY_FOR_PICKUP",
-                    title: "Siap Diambil",
-                    description: "Siap diambil bersama pesanan",
-                    timestamp: "Estimasi: 09 Des 2025, 16:00",
-                    completed: false
-                  }
-                ]
-              }
-            ],
-            // Overall tracking untuk pesanan secara keseluruhan
-            overall_tracking: {
-              current_status: "PROCESSING",
-              current_stage: "Dalam Proses",
-              overall_progress: 68,
-              next_estimated_time: "10 Des 2025, 09:00"
-            }
-          },
-          payment_gateway: {
-            provider: "CleanCloud Payment",
-            redirect_url: "https://payment.cleancloud.cloud/invoice/xyz123abc"
-          }
-        }
+      console.error('Error fetching invoice data:', error);
+      
+      // Tampilkan error modal untuk fetch data
+      setErrorModal({
+        show: true,
+        title: 'Gagal Memuat Data Invoice',
+        message: 'Terjadi kesalahan saat mengambil data invoice dari server.',
+        details: error.message
       });
+      
+      // Set data kosong
+      setInvoiceData(null);
     } finally {
       setLoading(false);
     }
@@ -406,163 +121,198 @@ const InvoicePage = () => {
     }).format(amount);
   };
 
-  const handlePayment = async () => {
+const handlePayment = async () => {
   if (!invoiceData) return;
 
-  try {
-    setPaymentProcessing(true);
-
-    const paymentData = {
-      order: {
-        invoice_number: `${invoiceData.data.invoice.invoice_number}`,
-        amount: invoiceData.data.invoice.total,
-        currency: 'IDR',
-      },
-      customer: {
-        id: `USER-${invoiceData.data.invoice.consumer_id}`,
-        name: invoiceData.data.invoice.customer_name,
-        email: `${invoiceData.data.invoice.customer_name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
-        phone: '08123456789'
-      },
-      additional_info: {
-        override_notification_url: "https://api.cleancloud.click/payment/notify",
-        payment_type: "invoicepayment",
-        invoice_id: invoiceNumber,
-        customer_id: invoiceData.data.invoice.consumer_id
-      },
-      payment: {
-        payment_due_date: 60,
-        description: `Pembayaran invoice laundry: ${invoiceData.data.invoice.invoice_number}`
-      }
-    };
-
-    console.log('🔄 [INVOICE PAYMENT] Sending payment data:', paymentData);
-    
-    // ✅ PERBAIKAN: Gunakan endpoint yang benar (tanpa /invoice)
-    const endpointUrl = 'http://localhost:8080/doku/payment'; // <-- Hapus /invoice
-    console.log('🔗 [INVOICE PAYMENT] Endpoint URL:', endpointUrl);
-    
-    const response = await fetch(endpointUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(paymentData)
+  // Cek apakah invoice sudah lunas
+  if (invoiceData.data.invoice.payment_status === 'LUNAS') {
+    setErrorModal({
+      show: true,
+      title: 'Pembayaran Sudah Lunas',
+      message: 'Invoice ini sudah dibayar lunas dan tidak dapat diproses lagi.',
+      details: ''
     });
-
-    console.log('📡 [INVOICE PAYMENT] Response Status:', response.status, response.statusText);
-    
-    const responseText = await response.text();
-    console.log('📄 [INVOICE PAYMENT] Raw Response Text:', responseText);
-    
-    let result;
-    try {
-      result = JSON.parse(responseText);
-      console.log('✅ [INVOICE PAYMENT] Parsed Response:', result);
-    } catch (parseError) {
-      console.error('❌ [INVOICE PAYMENT] JSON Parse Error:', parseError);
-      throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 100)}`);
-    }
-
-    if (!response.ok) {
-      console.error('❌ [INVOICE PAYMENT] Server Error Response:', result);
-      throw new Error(result.message || `Server error: ${response.status} ${response.statusText}`);
-    }
-
-    // ✅ Perbaikan parsing response berdasarkan struktur Go
-    let paymentUrl = null;
-    
-    // Cek berbagai kemungkinan struktur response dari DOKU API
-    if (result.response?.payment?.url) {
-      paymentUrl = result.response.payment.url;
-      console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.response.payment.url');
-    } else if (result.payment_url) {
-      paymentUrl = result.payment_url;
-      console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.payment_url');
-    } else if (result.url) {
-      paymentUrl = result.url;
-      console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.url');
-    } else if (result.data?.payment_url) {
-      paymentUrl = result.data.payment_url;
-      console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.data.payment_url');
-    } else if (result.data?.url) {
-      paymentUrl = result.data.url;
-      console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.data.url');
-    }
-
-    if (paymentUrl) {
-      console.log('🔗 [INVOICE PAYMENT] Payment URL received:', paymentUrl);
-      
-      // Tunggu sedikit untuk memastikan UI tidak freeze
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // ✅ Load DOKU script jika belum dimuat
-      if (!window.loadJokulCheckout) {
-        console.log('📦 [INVOICE PAYMENT] DOKU script not loaded, loading now...');
-        await loadDokuScript();
-      }
-      
-      // Panggil loadJokulCheckout langsung - DOKU akan membuat modal sendiri
-      if (window.loadJokulCheckout) {
-        console.log('🚀 [INVOICE PAYMENT] Launching DOKU Checkout...');
-        window.loadJokulCheckout(paymentUrl);
-        
-        // Tampilkan modal sukses
-        setShowPaymentModal(false);
-        
-      } else {
-        console.warn('⚠️ [INVOICE PAYMENT] DOKU Checkout function not available');
-        // Fallback: open in new tab
-        window.open(paymentUrl, '_blank', 'noopener,noreferrer');
-        setShowPaymentModal(false);
-      }
-      
-    } else {
-      console.warn('⚠️ [INVOICE PAYMENT] No payment URL found in response');
-      console.log('📊 [INVOICE PAYMENT] Full response structure:', JSON.stringify(result, null, 2));
-      throw new Error('URL pembayaran tidak ditemukan dalam response server');
-    }
-  } catch (error) {
-    console.error('❌ [INVOICE PAYMENT] Error:', error);
-    // Tampilkan error modal atau toast notification
-  } finally {
-    setPaymentProcessing(false);
-    
-    // Refresh data setelah pembayaran
-    setTimeout(() => {
-      fetchInvoiceData();
-    }, 3000);
-  }
-};
-
-// Load DOKU Script
-const loadDokuScript = () => {
-  // Cek apakah script sudah diload
-  if (window.loadJokulCheckout || document.querySelector('script[src*="jokul-checkout"]')) {
-    console.log('✅ DOKU Checkout script already loaded');
     return;
   }
 
-  // Tambahkan script DOKU Checkout
-  const script = document.createElement('script');
-  script.src = 'https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js';
-  script.async = true;
-  
-  script.onload = () => {
-    console.log('✅ DOKU Checkout script loaded successfully');
-  };
-  
-  script.onerror = () => {
-    console.error('❌ Failed to load DOKU Checkout script');
-  };
-  
-  document.head.appendChild(script);
-};
+    try {
+      setPaymentProcessing(true);
 
-useEffect(() => {
-  fetchInvoiceData();
-  loadDokuScript(); // ✅ Load DOKU script saat komponen mount
-}, [invoiceNumber]);
+      const paymentData = {
+        order: {
+          invoice_number: `${invoiceData.data.invoice.invoice_number}`,
+          amount: invoiceData.data.invoice.total,
+          currency: 'IDR',
+        },
+        customer: {
+          id: `USER-${invoiceData.data.invoice.consumer_id}`,
+          name: invoiceData.data.invoice.customer_name,
+          email: `${invoiceData.data.invoice.customer_name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+          phone: '08123456789'
+        },
+        additional_info: {
+          override_notification_url: "https://api.cleancloud.click/payment/notify",
+          payment_type: "invoicepayment",
+          invoice_id: invoiceNumber,
+          customer_id: invoiceData.data.invoice.consumer_id
+        },
+        payment: {
+          payment_due_date: 60,
+          description: `Pembayaran invoice laundry: ${invoiceData.data.invoice.invoice_number}`
+        }
+      };
+
+      console.log('🔄 [INVOICE PAYMENT] Sending payment data:', paymentData);
+      
+      const endpointUrl = buildApiUrl('/doku/payment');
+      console.log('🔗 [INVOICE PAYMENT] Endpoint URL:', endpointUrl);
+      
+      const response = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(paymentData)
+      });
+
+      console.log('📡 [INVOICE PAYMENT] Response Status:', response.status, response.statusText);
+      
+      const responseText = await response.text();
+      console.log('📄 [INVOICE PAYMENT] Raw Response Text:', responseText);
+      
+      let result;
+      try {
+        result = JSON.parse(responseText);
+        console.log('✅ [INVOICE PAYMENT] Parsed Response:', result);
+      } catch (parseError) {
+        console.error('❌ [INVOICE PAYMENT] JSON Parse Error:', parseError);
+        throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 100)}`);
+      }
+
+      if (!response.ok) {
+        console.error('❌ [INVOICE PAYMENT] Server Error Response:', result);
+        
+        // Tampilkan error modal dengan pesan dari server
+        setErrorModal({
+          show: true,
+          title: 'Gagal Memproses Pembayaran',
+          message: result.message || `Terjadi kesalahan saat memproses pembayaran.`,
+          details: response.statusText || 'Tidak ada detail tambahan'
+        });
+        
+        throw new Error(result.message || `Server error: ${response.status} ${response.statusText}`);
+      }
+
+      // ✅ Perbaikan parsing response berdasarkan struktur Go
+      let paymentUrl = null;
+      
+      // Cek berbagai kemungkinan struktur response dari DOKU API
+      if (result.response?.payment?.url) {
+        paymentUrl = result.response.payment.url;
+        console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.response.payment.url');
+      } else if (result.payment_url) {
+        paymentUrl = result.payment_url;
+        console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.payment_url');
+      } else if (result.url) {
+        paymentUrl = result.url;
+        console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.url');
+      } else if (result.data?.payment_url) {
+        paymentUrl = result.data.payment_url;
+        console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.data.payment_url');
+      } else if (result.data?.url) {
+        paymentUrl = result.data.url;
+        console.log('🔗 [INVOICE PAYMENT] Found payment URL in result.data.url');
+      }
+
+      if (paymentUrl) {
+        console.log('🔗 [INVOICE PAYMENT] Payment URL received:', paymentUrl);
+        
+        // Tunggu sedikit untuk memastikan UI tidak freeze
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // ✅ Load DOKU script jika belum dimuat
+        if (!window.loadJokulCheckout) {
+          console.log('📦 [INVOICE PAYMENT] DOKU script not loaded, loading now...');
+          await loadDokuScript();
+        }
+        
+        // Panggil loadJokulCheckout langsung - DOKU akan membuat modal sendiri
+        if (window.loadJokulCheckout) {
+          console.log('🚀 [INVOICE PAYMENT] Launching DOKU Checkout...');
+          window.loadJokulCheckout(paymentUrl);
+          
+          // Tampilkan modal sukses
+          setShowPaymentModal(false);
+          
+        } else {
+          console.warn('⚠️ [INVOICE PAYMENT] DOKU Checkout function not available');
+          // Fallback: open in new tab
+          window.open(paymentUrl, '_blank', 'noopener,noreferrer');
+          setShowPaymentModal(false);
+        }
+        
+      } else {
+        console.warn('⚠️ [INVOICE PAYMENT] No payment URL found in response');
+        console.log('📊 [INVOICE PAYMENT] Full response structure:', JSON.stringify(result, null, 2));
+        
+        // Tampilkan error modal untuk kasus tidak ada payment URL
+        setErrorModal({
+          show: true,
+          title: 'URL Pembayaran Tidak Ditemukan',
+          message: 'Sistem tidak dapat menemukan URL pembayaran dari server.',
+          details: 'Response server tidak mengandung URL pembayaran yang valid.'
+        });
+      }
+    } catch (error) {
+      console.error('❌ [INVOICE PAYMENT] Error:', error);
+      
+      // Tampilkan error modal untuk kesalahan umum
+      if (!errorModal.show) {
+        setErrorModal({
+          show: true,
+          title: 'Terjadi Kesalahan',
+          message: 'Gagal memproses pembayaran. Silakan coba lagi.',
+          details: error.message
+        });
+      }
+    } finally {
+      setPaymentProcessing(false);
+      
+      // Refresh data setelah pembayaran
+      setTimeout(() => {
+        fetchInvoiceData();
+      }, 3000);
+    }
+  };
+
+  // Load DOKU Script
+  const loadDokuScript = () => {
+    // Cek apakah script sudah diload
+    if (window.loadJokulCheckout || document.querySelector('script[src*="jokul-checkout"]')) {
+      console.log('✅ DOKU Checkout script already loaded');
+      return;
+    }
+
+    // Tambahkan script DOKU Checkout
+    const script = document.createElement('script');
+    script.src = 'https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js';
+    script.async = true;
+    
+    script.onload = () => {
+      console.log('✅ DOKU Checkout script loaded successfully');
+    };
+    
+    script.onerror = () => {
+      console.error('❌ Failed to load DOKU Checkout script');
+    };
+    
+    document.head.appendChild(script);
+  };
+
+  useEffect(() => {
+    fetchInvoiceData();
+    loadDokuScript(); // ✅ Load DOKU script saat komponen mount
+  }, [invoiceNumber]);
 
   const PaymentSuccessModal = () => {
     const handleClose = () => {
@@ -609,32 +359,118 @@ useEffect(() => {
     );
   };
 
-   
+  // Component untuk Error Modal
+  const ErrorModal = () => {
+    const handleClose = () => {
+      setErrorModal({
+        show: false,
+        title: '',
+        message: '',
+        details: ''
+      });
+    };
+
+    const handleRetry = () => {
+      handleClose();
+      if (errorModal.title === 'Gagal Memuat Data Invoice') {
+        fetchInvoiceData();
+      } else if (errorModal.title === 'Gagal Memproses Pembayaran') {
+        handlePayment();
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                  <FaExclamationCircle className="text-red-600 text-xl" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">{errorModal.title}</h3>
+              </div>
+              <button
+                onClick={handleClose}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-700 mb-3">{errorModal.message}</p>
+              
+              {errorModal.details && (
+                <div className="bg-gray-50 rounded-lg p-3 mt-3">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Detail Error:</p>
+                  <p className="text-xs text-gray-500 font-mono break-words">{errorModal.details}</p>
+                </div>
+              )}
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+                <p className="text-sm text-yellow-700">
+                  <FaExclamationCircle className="inline mr-2" />
+                  Silakan coba lagi beberapa saat atau hubungi laundry jika masalah berlanjut.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={handleRetry}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition"
+              >
+                Coba Lagi
+              </button>
+              <button
+                onClick={handleClose}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
+              >
+                Tutup
+              </button>
+            </div>
+            
+            {errorModal.title === 'Gagal Memuat Data Invoice' && (
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => navigate('/')}
+                  className="text-sm text-blue-600 hover:text-blue-800 transition"
+                >
+                  Kembali ke Halaman Utama
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const getPaymentStatusBadge = (status) => {
-    switch(status) {
-      case 'PAID':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-            <FaCheckCircle className="mr-1" /> LUNAS
-          </span>
-        );
-      case 'UNPAID':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-            <FaExclamationCircle className="mr-1" /> BELUM LUNAS
-          </span>
-        );
-      case 'PARTIAL':
-        return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-            <FaClock className="mr-1" /> SEBAGIAN
-          </span>
-        );
-      default:
-        return null;
-    }
-  };
+  switch(status) {
+    case 'LUNAS':
+      return (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+          <FaCheckCircle className="mr-1" /> LUNAS
+        </span>
+      );
+    case 'BELUM LUNAS':
+      return (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+          <FaExclamationCircle className="mr-1" /> BELUM LUNAS
+        </span>
+      );
+    case 'SEBAGIAN':
+      return (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+          <FaClock className="mr-1" /> SEBAGIAN
+        </span>
+      );
+    default:
+      return null;
+  }
+};
 
   const getWorkStatusBadge = (status) => {
     const statusConfig = {
@@ -674,8 +510,6 @@ useEffect(() => {
     if (track.current) return 'text-blue-700';
     return 'text-gray-700';
   };
-
-  
 
   // Component untuk menampilkan tracking per item
   const TrackingTimeline = ({ item }) => {
@@ -805,6 +639,38 @@ useEffect(() => {
       </div>
     );
   }
+
+  // Jika data invoice tidak ada (error saat fetch)
+  if (!invoiceData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center max-w-md p-8">
+          <FaExclamationCircle className="text-5xl text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Gagal Memuat Invoice</h2>
+          <p className="text-gray-600 mb-6">
+            Tidak dapat memuat data invoice. Silakan coba lagi atau hubungi laundry untuk bantuan.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={fetchInvoiceData}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition"
+            >
+              Coba Lagi
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
+            >
+              Kembali ke Halaman Utama
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Cek apakah invoice sudah lunas
+  const isPaid = invoiceData.data.invoice.payment_status === 'PAID';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100">
@@ -1056,63 +922,85 @@ useEffect(() => {
           <div className="space-y-8">
             {/* Payment Summary */}
             <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-              <h3 className="font-semibold text-gray-900 mb-6 flex items-center">
-                <FaMoneyBillWave className="mr-2 text-green-600" />
-                Ringkasan Pembayaran
-              </h3>
-              
-              <div className="space-y-4">
-                {invoiceData.data.invoice.items.map((item) => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <span className="text-gray-600">{item.service_name}</span>
-                    <span className="font-medium">{formatCurrency(item.subtotal)}</span>
-                  </div>
-                ))}
-                
-                <div className="border-t pt-4 mt-4">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span className="text-blue-600">{formatCurrency(invoiceData.data.invoice.total)}</span>
-                  </div>
-                  
-                  <div className="mt-4 text-sm text-gray-600">
-                    <div className="flex items-center mb-2">
-                      <FaCalendarAlt className="mr-2" />
-                      <span>Jatuh Tempo: {invoiceData.data.invoice.due_date}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <FaClock className="mr-2" />
-                      <span>Status: {invoiceData.data.invoice.payment_status}</span>
-                    </div>
-                    <div className="flex items-center mt-2">
-                      <FaBox className="mr-2" />
-                      <span>Jumlah Item: {invoiceData.data.invoice.items.length}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Payment Button */}
-              {invoiceData.data.invoice.payment_status !== 'PAID' && (
-                <button
-                  onClick={handlePayment}
-                  disabled={paymentProcessing}
-                  className="w-full mt-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50"
-                >
-                  {paymentProcessing ? (
-                    <>
-                      <FaSpinner className="animate-spin mr-3" />
-                      Mengarahkan ke Payment Gateway...
-                    </>
-                  ) : (
-                    <>
-                      <FaCreditCard className="mr-3" />
-                      Bayar Sekarang
-                    </>
-                  )}
-                </button>
-              )}
+  <h3 className="font-semibold text-gray-900 mb-6 flex items-center">
+    <FaMoneyBillWave className="mr-2 text-green-600" />
+    Ringkasan Pembayaran
+  </h3>
+  
+  <div className="space-y-4">
+    {invoiceData.data.invoice.items.map((item) => (
+      <div key={item.id} className="flex justify-between text-sm">
+        <span className="text-gray-600">{item.service_name}</span>
+        <span className="font-medium">{formatCurrency(item.subtotal)}</span>
+      </div>
+    ))}
+    
+    <div className="border-t pt-4 mt-4">
+      <div className="flex justify-between text-lg font-bold">
+        <span>Total</span>
+        <span className="text-blue-600">{formatCurrency(invoiceData.data.invoice.total)}</span>
+      </div>
+      
+      <div className="mt-4 text-sm text-gray-600">
+        <div className="flex items-center mb-2">
+          <FaCalendarAlt className="mr-2" />
+          <span>Jatuh Tempo: {invoiceData.data.invoice.due_date}</span>
+        </div>
+        <div className="flex items-center">
+          <FaClock className="mr-2" />
+          <span>Status: {invoiceData.data.invoice.payment_status === 'LUNAS' ? 'LUNAS' : 'BELUM LUNAS'}</span>
+        </div>
+        <div className="flex items-center mt-2">
+          <FaBox className="mr-2" />
+          <span>Jumlah Item: {invoiceData.data.invoice.items.length}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  {/* Payment Button atau Status LUNAS */}
+  <div className="w-full mt-6">
+    {invoiceData.data.invoice.payment_status === 'LUNAS' ? (
+      <div className="text-center">
+        <div className="bg-green-100 border border-green-300 rounded-xl p-6">
+          <div className="flex flex-col items-center justify-center">
+            <FaCheckCircle className="text-4xl text-green-600 mb-3" />
+            <h3 className="text-lg font-bold text-green-800 mb-2">PEMBAYARAN SUDAH LUNAS</h3>
+            
+            <div className="mt-4 text-xs text-green-600">
+              Terima kasih telah menggunakan layanan kami
             </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 bg-blue-50 rounded-lg p-4">
+          <p className="text-sm text-blue-700 text-center">
+            <FaBell className="inline mr-2" />
+            Anda dapat mengambil pesanan Anda di laundry sesuai jadwal yang telah ditentukan.
+          </p>
+        </div>
+      </div>
+    ) : (
+      <button
+        onClick={handlePayment}
+        disabled={paymentProcessing}
+        className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50"
+      >
+        {paymentProcessing ? (
+          <>
+            <FaSpinner className="animate-spin mr-3" />
+            Mengarahkan ke Payment Gateway...
+          </>
+        ) : (
+          <>
+            <FaCreditCard className="mr-3" />
+            Bayar Sekarang
+          </>
+        )}
+      </button>
+    )}
+  </div>
+</div>
 
             {/* Important Notes */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
@@ -1137,83 +1025,65 @@ useEffect(() => {
               </ul>
             </div>
 
-            {/* Payment Info */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-              <h3 className="font-semibold text-blue-900 mb-3">Pembayaran via CleanCloud</h3>
-              <p className="text-sm text-blue-700 mb-4">
-                Semua pembayaran diproses melalui sistem payment gateway CleanCloud yang aman dan terpercaya.
-              </p>
-              <div className="text-xs text-blue-600">
-                <div className="flex items-center mb-1">
-                  <FaCheckCircle className="mr-2" />
-                  <span>Transaksi aman & terenkripsi</span>
-                </div>
-                <div className="flex items-center mb-1">
-                  <FaCheckCircle className="mr-2" />
-                  <span>Konfirmasi otomatis real-time</span>
-                </div>
-                <div className="flex items-center">
-                  <FaCheckCircle className="mr-2" />
-                  <span>Support 24/7 untuk masalah pembayaran</span>
+            {/* Payment Info - hanya tampil jika belum lunas */}
+            {!isPaid && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                <h3 className="font-semibold text-blue-900 mb-3">Pembayaran via CleanCloud</h3>
+                <p className="text-sm text-blue-700 mb-4">
+                  Semua pembayaran diproses melalui sistem payment gateway CleanCloud yang aman dan terpercaya.
+                </p>
+                <div className="text-xs text-blue-600">
+                  <div className="flex items-center mb-1">
+                    <FaCheckCircle className="mr-2" />
+                    <span>Transaksi aman & terenkripsi</span>
+                  </div>
+                  <div className="flex items-center mb-1">
+                    <FaCheckCircle className="mr-2" />
+                    <span>Konfirmasi otomatis real-time</span>
+                  </div>
+                  <div className="flex items-center">
+                    <FaCheckCircle className="mr-2" />
+                    <span>Support 24/7 untuk masalah pembayaran</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Status Info tambahan jika sudah lunas */}
+            {isPaid && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                <h3 className="font-semibold text-green-900 mb-3 flex items-center">
+                  <FaCheckCircle className="mr-2" />
+                  Status Pembayaran
+                </h3>
+                <p className="text-sm text-green-700 mb-4">
+                  Pembayaran invoice ini sudah lunas dan telah dikonfirmasi oleh sistem.
+                </p>
+                <div className="text-xs text-green-600">
+                  <div className="flex items-center mb-1">
+                    <FaCheckCircle className="mr-2" />
+                    <span>Pembayaran sudah diterima</span>
+                  </div>
+                  <div className="flex items-center mb-1">
+                    <FaCheckCircle className="mr-2" />
+                    <span>Status pembayaran: LUNAS</span>
+                  </div>
+                  <div className="flex items-center">
+                    <FaCheckCircle className="mr-2" />
+                    <span>Pesanan dapat diambil sesuai jadwal</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Payment Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Konfirmasi Pembayaran</h3>
-              <p className="text-gray-600 mb-6">
-                Anda akan melakukan pembayaran untuk {invoiceData.data.invoice.items.length} item
-              </p>
-              
-              <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-600">Total Pembayaran</span>
-                  <span className="text-2xl font-bold text-green-600">
-                    {formatCurrency(invoiceData.data.invoice.total)}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-500 text-center mt-2">
-                  Pembayaran akan diproses melalui CleanCloud Payment Gateway
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <button
-                  onClick={() => handlePayment('cleancloud')}
-                  disabled={paymentProcessing}
-                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center disabled:opacity-50"
-                >
-                  {paymentProcessing ? (
-                    <>
-                      <FaSpinner className="animate-spin mr-3" />
-                      Mengarahkan ke Payment Gateway...
-                    </>
-                  ) : (
-                    <>
-                      <FaCreditCard className="mr-3" />
-                      Bayar Sekarang
-                    </>
-                  )}
-                </button>
-                
-                <button
-                  onClick={() => setShowPaymentModal(false)}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
-                >
-                  Batalkan
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showPaymentModal && <PaymentSuccessModal />}
+
+      {/* Error Modal */}
+      {errorModal.show && <ErrorModal />}
 
       {/* Footer */}
       <div className="bg-gray-800 text-white py-6">
@@ -1226,6 +1096,11 @@ useEffect(() => {
               <p className="text-gray-500 text-xs mt-1">
                 Invoice ini sah secara hukum dan dapat digunakan sebagai bukti transaksi.
               </p>
+              {isPaid && (
+                <p className="text-green-400 text-xs mt-1">
+                  ✓ Pembayaran sudah lunas dan terverifikasi
+                </p>
+              )}
             </div>
             <div className="mt-4 md:mt-0">
               <a 

@@ -12,6 +12,7 @@ import {
   FaCheckCircle
 } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
+import { buildApiUrl } from '../apiConfig';
 
 const KosanOwnerLogin = () => {
   const navigate = useNavigate();
@@ -36,7 +37,8 @@ const KosanOwnerLogin = () => {
 
   const testAPIConnection = async () => {
     try {
-      const response = await fetch('http://localhost:8080/public/landingpage');
+      //const response = await fetch('http://localhost:8080/public/landingpage');
+      const response = await fetch(buildApiUrl('/public/landingpage'));
       setApiStatus(response.ok ? 'connected' : 'error');
     } catch {
       setApiStatus('error');
@@ -52,11 +54,11 @@ const KosanOwnerLogin = () => {
   setError('');
 
   try {
-    const response = await fetch('http://localhost:8080/api/kosan-owner/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
+    const response = await fetch(buildApiUrl('/api/kosan-owner/login'), {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(formData),
+});
 
     const data = await response.json();
 
