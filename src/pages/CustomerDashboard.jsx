@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   FaUser, 
   FaHome, 
@@ -25,9 +25,18 @@ import {
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { buildApiUrl } from "../apiConfig";
 
+// Constants untuk status WebSocket
+const WS_URL = "wss://api.cleancloud.cloud/ws";
+const WS_RECONNECT_DELAY = 5000;
+const WS_HEARTBEAT_INTERVAL = 30000; // 30 detik
+const WS_CONNECTION_TIMEOUT = 10000; // 10 detik
+const MAX_RECONNECT_ATTEMPTS = 5;
+
 const CustomerDashboard = () => {
   const { customerId } = useParams();
   const navigate = useNavigate();
+  
+  // State utama
   const [customerData, setCustomerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('ALL');
@@ -40,6 +49,9 @@ const CustomerDashboard = () => {
   const [paymentError, setPaymentError] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   
+  // State untuk melacak pembayaran terbaru
+  const [recentPayments, setRecentPayments] = useState([]);
+  
   // State untuk konfirmasi modal
   const [paymentConfirmModal, setPaymentConfirmModal] = useState({
     isOpen: false,
@@ -50,6 +62,327 @@ const CustomerDashboard = () => {
     description: '',
     unpaidCount: 0
   });
+
+  // WebSocket Refs
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const heartbeatIntervalRef = useRef(null);
+  const connectionTimeoutRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
+  
+  // Ref untuk menyimpan fungsi terbaru
+  const fetchCustomerDataRef = useRef(null);
+
+  // Fungsi untuk menambahkan invoice yang baru dibayar
+  const addRecentPayment = useCallback((invoiceNumber) => {
+    setRecentPayments(prev => [...prev, {
+      invoiceNumber,
+      timestamp: Date.now()
+    }]);
+    
+    // Hapus dari list setelah 10 menit
+    setTimeout(() => {
+      setRecentPayments(prev => 
+        prev.filter(p => p.invoiceNumber !== invoiceNumber)
+      );
+    }, 10 * 60 * 1000); // 10 menit
+  }, []);
+
+  // Fungsi untuk mengecek apakah ini pembayaran terbaru
+  const checkIfRecentPayment = useCallback((invoiceNumber) => {
+    return recentPayments.some(p => p.invoiceNumber === invoiceNumber);
+  }, [recentPayments]);
+
+  // Fetch customer data
+  const fetchCustomerData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(buildApiUrl(`/public/1/customers/${customerId}`));
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || 'API Error');
+      }
+      
+      // Validasi dan transformasi data
+      const validatedData = validateAndTransformData(data);
+      setCustomerData(validatedData);
+      
+      console.log("✅ [Customer] Data loaded, customer ID:", customerId);
+      
+    } catch (error) {
+      console.error('❌ [Customer] Error fetching data:', error);
+      setError('Gagal memuat data pelanggan. Silakan coba lagi.');
+      
+      // Mock data untuk development
+      const mockData = createMockData();
+      setCustomerData(mockData);
+    } finally {
+      setLoading(false);
+    }
+  }, [customerId]);
+
+  // Update ref ketika fungsi berubah
+  useEffect(() => {
+    fetchCustomerDataRef.current = fetchCustomerData;
+  }, [fetchCustomerData]);
+
+  // WebSocket connection management
+  const connectWebSocket = useCallback(() => {
+    console.log("🔌 [WebSocket] Connecting to:", WS_URL);
+    console.log("👤 [WebSocket] For customer ID:", customerId);
+    
+    // Clean up existing connection
+    if (wsRef.current) {
+      console.log("🗑️ [WebSocket] Closing existing connection");
+      wsRef.current.close(1000, "Reconnecting");
+      wsRef.current = null;
+    }
+    
+    // Clear any existing timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+    
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
+    
+    try {
+      const ws = new WebSocket(WS_URL);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log("✅ [WebSocket] Connected successfully");
+        reconnectAttemptsRef.current = 0;
+        
+        // Clear connection timeout
+        if (connectionTimeoutRef.current) {
+          clearTimeout(connectionTimeoutRef.current);
+          connectionTimeoutRef.current = null;
+        }
+        
+        // Register customer to WebSocket
+        if (customerId) {
+          const registerMessage = JSON.stringify({
+            event: "REGISTER_CUSTOMER",
+            data: { customer_id: customerId }
+          });
+          console.log("📤 [WebSocket] Registering customer:", customerId);
+          ws.send(registerMessage);
+        }
+        
+        // Start heartbeat
+        heartbeatIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            const pingMessage = JSON.stringify({
+              event: "PING",
+              timestamp: Date.now(),
+              customer_id: customerId
+            });
+            ws.send(pingMessage);
+            console.log("❤️ [WebSocket] Sending heartbeat");
+          }
+        }, WS_HEARTBEAT_INTERVAL);
+      };
+
+      ws.onmessage = (event) => {
+        console.log("📩 [WebSocket] Raw message received:", event.data);
+        try {
+          const msg = JSON.parse(event.data);
+          console.log("📩 [WebSocket] Parsed message:", msg);
+
+          // HANDLER UTAMA: REGISTRATION_ACCEPTED (untuk semua update)
+          if (msg.event === "REGISTRATION_ACCEPTED") {
+            console.log("✅ [WebSocket] Registration accepted:", msg.data?.noresi || msg.data?.customer_id);
+            
+            // Jika ada noresi (invoice), refresh data
+            if (msg.data?.noresi) {
+              console.log("🔄 [WebSocket] Invoice update detected:", msg.data.noresi);
+              
+              // Tandai sebagai payment success
+              setPaymentSuccess(true);
+              
+              // Refresh customer data dengan debounce
+              if (fetchCustomerDataRef.current) {
+                console.log("🔄 [WebSocket] Scheduling data refresh...");
+                
+                // Clear existing timeout
+                if (window.refreshTimeout) {
+                  clearTimeout(window.refreshTimeout);
+                }
+                
+                // Debounce refresh untuk menghindari multiple calls
+                window.refreshTimeout = setTimeout(() => {
+                  console.log("🔄 [WebSocket] Executing data refresh...");
+                  fetchCustomerDataRef.current();
+                }, 1500); // Tunggu 1.5 detik
+              }
+              
+              // Tampilkan notifikasi ke user
+              setTimeout(() => {
+                const invoiceNumber = msg.data.noresi;
+                const isRecent = checkIfRecentPayment(invoiceNumber);
+                
+                if (isRecent) {
+                  alert(`✅ Pembayaran untuk invoice ${invoiceNumber} berhasil! Data telah diperbarui.`);
+                } else {
+                  console.log(`🔄 [WebSocket] Invoice ${invoiceNumber} status updated`);
+                }
+              }, 600);
+            }
+            
+            // Jika hanya customer registration, log saja
+            else if (msg.data?.customer_id) {
+              console.log("✅ [WebSocket] Customer registration confirmed");
+            }
+          }
+          
+          // Handler untuk PONG response
+          if (msg.event === "PONG") {
+            console.log("❤️ [WebSocket] Heartbeat response received");
+          }
+          
+        } catch (err) {
+          console.error("❌ [WebSocket] Parse error:", err, "Raw:", event.data);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error("❌ [WebSocket] Error event:", err);
+        console.error("❌ [WebSocket] ReadyState:", ws.readyState);
+      };
+
+      ws.onclose = (event) => {
+        console.log("🔌 [WebSocket] Closed:", {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean
+        });
+        
+        // Cleanup intervals
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+          heartbeatIntervalRef.current = null;
+        }
+        
+        if (connectionTimeoutRef.current) {
+          clearTimeout(connectionTimeoutRef.current);
+          connectionTimeoutRef.current = null;
+        }
+        
+        // Attempt reconnect after delay if not normal closure
+        if (event.code !== 1000 && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttemptsRef.current++;
+          console.log(`🔄 [WebSocket] Will reconnect in ${WS_RECONNECT_DELAY}ms (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log("🔄 [WebSocket] Attempting reconnect...");
+            connectWebSocket();
+          }, WS_RECONNECT_DELAY);
+        } else if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          console.log("🚫 [WebSocket] Max reconnection attempts reached");
+        }
+      };
+      
+      // Set connection timeout
+      connectionTimeoutRef.current = setTimeout(() => {
+        if (ws.readyState === WebSocket.CONNECTING) {
+          console.log("⏰ [WebSocket] Connection timeout");
+          ws.close();
+        }
+      }, WS_CONNECTION_TIMEOUT);
+      
+      return ws;
+    } catch (error) {
+      console.error("❌ [WebSocket] Connection error:", error);
+      return null;
+    }
+  }, [customerId, checkIfRecentPayment]);
+
+  // Cleanup WebSocket connections
+  const cleanupWebSocket = useCallback(() => {
+    console.log("🧹 [WebSocket] Cleaning up connections...");
+    
+    if (wsRef.current) {
+      wsRef.current.close(1000, "Component unmounting");
+      wsRef.current = null;
+    }
+    
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+    
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
+    
+    // Clear global refresh timeout
+    if (window.refreshTimeout) {
+      clearTimeout(window.refreshTimeout);
+      window.refreshTimeout = null;
+    }
+    
+    reconnectAttemptsRef.current = 0;
+  }, []);
+
+  // Initialize WebSocket when component mounts and customerId is available
+  useEffect(() => {
+    console.log("🚀 [CustomerDashboard] Component mounted");
+    
+    if (customerId) {
+      console.log("🔌 [WebSocket] Initializing WebSocket for customer:", customerId);
+      connectWebSocket();
+    } else {
+      console.error("❌ [WebSocket] No customerId available");
+    }
+    
+    return () => {
+      console.log("🧹 [CustomerDashboard] Component unmounting, cleaning up...");
+      cleanupWebSocket();
+    };
+  }, [customerId, connectWebSocket, cleanupWebSocket]);
+
+  // Monitor WebSocket status (optional, untuk debugging)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const ws = wsRef.current;
+      if (ws) {
+        console.log("📡 [WS STATUS]", {
+          readyState: ws.readyState,
+          state: {
+            0: 'CONNECTING',
+            1: 'OPEN',
+            2: 'CLOSING',
+            3: 'CLOSED'
+          }[ws.readyState],
+          url: ws.url
+        });
+      }
+    }, 10000); // Check setiap 10 detik
+    
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     fetchCustomerData();
@@ -69,51 +402,61 @@ const CustomerDashboard = () => {
         console.error('❌ Failed to load DOKU Checkout script');
       };
     }
-  }, [customerId]);
+  }, [customerId, fetchCustomerData]);
+
+  // Handle WebSocket reconnection when customerId changes
+  useEffect(() => {
+    if (customerId && wsRef.current) {
+      console.log("🔄 [WebSocket] Customer ID changed, reconnecting...");
+      cleanupWebSocket();
+      setTimeout(() => connectWebSocket(), 100);
+    }
+  }, [customerId, connectWebSocket, cleanupWebSocket]);
 
   const getProcessingStatusBadge = useCallback((status) => {
-  if (!status) return null;
+    if (!status) return null;
 
-  const statusConfig = {
-    'SELESAI': { 
-      color: 'bg-green-100 text-green-800', 
-      icon: <FaCheckCircle className="mr-1" />,
-      text: 'SELESAI'
-    },
-    'DALAM PROSES': { 
-      color: 'bg-blue-100 text-blue-800', 
-      icon: <FaSpinner className="animate-spin mr-1" />,
-      text: 'DALAM PROSES'
-    },
-    'MENUNGGU': { 
-      color: 'bg-yellow-100 text-yellow-800', 
+    const statusConfig = {
+      'SELESAI': { 
+        color: 'bg-green-100 text-green-800', 
+        icon: <FaCheckCircle className="mr-1" />,
+        text: 'SELESAI'
+      },
+      'DALAM PROSES': { 
+        color: 'bg-blue-100 text-blue-800', 
+        icon: <FaSpinner className="animate-spin mr-1" />,
+        text: 'DALAM PROSES'
+      },
+      'MENUNGGU': { 
+        color: 'bg-yellow-100 text-yellow-800', 
+        icon: <FaClock className="mr-1" />,
+        text: 'MENUNGGU'
+      },
+      'DIAMBIL': { 
+        color: 'bg-purple-100 text-purple-800', 
+        icon: <FaTshirt className="mr-1" />,
+        text: 'DIAMBIL'
+      },
+      'BATAL': { 
+        color: 'bg-red-100 text-red-800', 
+        icon: <FaExclamationCircle className="mr-1" />,
+        text: 'BATAL'
+      }
+    };
+    
+    const config = statusConfig[status] || { 
+      color: 'bg-gray-100 text-gray-800', 
       icon: <FaClock className="mr-1" />,
-      text: 'MENUNGGU'
-    },
-    'DIAMBIL': { 
-      color: 'bg-purple-100 text-purple-800', 
-      icon: <FaTshirt className="mr-1" />,
-      text: 'DIAMBIL'
-    },
-    'BATAL': { 
-      color: 'bg-red-100 text-red-800', 
-      icon: <FaExclamationCircle className="mr-1" />,
-      text: 'BATAL'
-    }
-  };
-  
-  const config = statusConfig[status] || { 
-    color: 'bg-gray-100 text-gray-800', 
-    icon: <FaClock className="mr-1" />,
-    text: status 
-  };
-  
-  return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
-      {config.icon} {config.text}
-    </span>
-  );
-}, []);
+      text: status 
+    };
+    
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
+        {config.icon} {config.text}
+      </span>
+    );
+  }, []);
+
   const openWhatsApp = useCallback(() => {
     if (!customerData?.data?.laundry?.phone) {
       alert('Nomor telepon laundry tidak tersedia.');
@@ -152,37 +495,6 @@ const CustomerDashboard = () => {
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   }, [customerData]);
   
-  const fetchCustomerData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch(buildApiUrl(`/public/1/customers/${customerId}`));
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'API Error');
-      }
-      
-      // Validasi dan transformasi data
-      const validatedData = validateAndTransformData(data);
-      setCustomerData(validatedData);
-    } catch (error) {
-      console.error('Error fetching customer data:', error);
-      setError('Gagal memuat data pelanggan. Silakan coba lagi.');
-      
-      // Mock data untuk development
-      const mockData = createMockData();
-      setCustomerData(mockData);
-    } finally {
-      setLoading(false);
-    }
-  }, [customerId]);
-
   // Fungsi untuk kembali ke halaman sebelumnya
   const handleGoBack = useCallback(() => {
     if (window.history.length > 1) {
@@ -459,9 +771,50 @@ const CustomerDashboard = () => {
     });
   }, []);
 
+  // Fungsi untuk mendaftarkan invoice ke WebSocket setelah pembayaran dibuat
+  const registerInvoiceToWebSocket = useCallback((invoiceNumber) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && invoiceNumber) {
+      // Register invoice untuk real-time updates
+      const registerMessage = JSON.stringify({
+        event: "REGISTER_INVOICE",
+        data: { noresi: invoiceNumber }
+      });
+      console.log("📤 [WebSocket] Registering invoice for real-time updates:", invoiceNumber);
+      wsRef.current.send(registerMessage);
+      
+      // Juga register customer untuk update umum
+      if (customerId) {
+        const customerMessage = JSON.stringify({
+          event: "REGISTER_CUSTOMER",
+          data: { customer_id: customerId }
+        });
+        wsRef.current.send(customerMessage);
+        console.log("📤 [WebSocket] Also registering customer:", customerId);
+      }
+    } else {
+      console.warn("⚠️ [WebSocket] Cannot register invoice - WebSocket not ready or no invoice number");
+    }
+  }, [customerId]);
+
   // Fungsi handlePayment untuk pembayaran
   const confirmPayment = useCallback(async () => {
     const { isBulkPayment, invoiceNumber, amount } = paymentConfirmModal;
+    
+    // TAMBAHKAN: Simpan invoice yang akan dibayar untuk tracking
+    if (!isBulkPayment && paymentConfirmModal.invoice?.invoice) {
+      addRecentPayment(paymentConfirmModal.invoice.invoice);
+      console.log("📝 [Payment] Tracking invoice:", paymentConfirmModal.invoice.invoice);
+    } else if (isBulkPayment) {
+      // Untuk bulk payment, ambil semua invoice unpaid
+      const unpaidInvoices = customerData?.data?.invoices
+        ?.filter(inv => inv.status === 'UNPAID')
+        .map(inv => inv.invoice) || [];
+      
+      unpaidInvoices.forEach(inv => {
+        addRecentPayment(inv);
+        console.log("📝 [Payment] Tracking bulk invoice:", inv);
+      });
+    }
     
     closePaymentConfirmation();
     
@@ -488,7 +841,7 @@ const CustomerDashboard = () => {
           phone: customerPhone
         },
         additional_info: {
-          override_notification_url: "https://api.cleancloud.click/payment/notify",
+          override_notification_url: "https://api.cleancloud.cloud/payment/notify",
           payment_type: isBulkPayment ? "bulkpayment" : "singlepayment"
         },
         payment: {
@@ -556,6 +909,21 @@ const CustomerDashboard = () => {
         if (paymentUrl) {
           console.log('🔗 [PAYMENT] Payment URL received:', paymentUrl);
           
+          // Register invoice to WebSocket for real-time updates
+          if (!isBulkPayment && paymentConfirmModal.invoice?.invoice) {
+            registerInvoiceToWebSocket(paymentConfirmModal.invoice.invoice);
+          } else if (isBulkPayment) {
+            // Untuk bulk payment, register customer saja
+            if (customerId && wsRef.current?.readyState === WebSocket.OPEN) {
+              const customerMessage = JSON.stringify({
+                event: "REGISTER_CUSTOMER",
+                data: { customer_id: customerId }
+              });
+              wsRef.current.send(customerMessage);
+              console.log("📤 [WebSocket] Registered customer for bulk payment updates");
+            }
+          }
+          
           // Tunggu sedikit untuk memastikan UI tidak freeze
           await new Promise(resolve => setTimeout(resolve, 100));
           
@@ -563,12 +931,11 @@ const CustomerDashboard = () => {
           if (window.loadJokulCheckout) {
             console.log('🚀 [PAYMENT] Launching DOKU Checkout...');
             window.loadJokulCheckout(paymentUrl);
-            setPaymentSuccess(true);
             
             // Tampilkan success message dengan detail
             const successMessage = isBulkPayment 
-              ? `Pembayaran untuk ${paymentConfirmModal.unpaidCount} tagihan berhasil dibuat. Silakan lanjutkan pembayaran di DOKU Checkout.`
-              : `Pembayaran untuk invoice ${invoiceNumber} berhasil dibuat. Silakan lanjutkan pembayaran di DOKU Checkout.`;
+              ? `Pembayaran untuk ${paymentConfirmModal.unpaidCount} tagihan berhasil dibuat. Silakan lanjutkan pembayaran di DOKU Checkout. Status akan diperbarui otomatis.`
+              : `Pembayaran untuk invoice ${invoiceNumber} berhasil dibuat. Silakan lanjutkan pembayaran di DOKU Checkout. Status akan diperbarui otomatis.`;
             
             setTimeout(() => {
               alert(successMessage);
@@ -596,13 +963,13 @@ const CustomerDashboard = () => {
       console.log('🏁 [PAYMENT] Process completed');
       setPaymentLoading(false);
       
-      // Refresh data setelah 5 detik
+      // Fallback refresh jika WebSocket tidak bekerja
       setTimeout(() => {
-        console.log('🔄 [PAYMENT] Refreshing customer data...');
+        console.log('🔄 [PAYMENT] Fallback: Refreshing customer data...');
         fetchCustomerData();
-      }, 5000);
+      }, 10000); // Fallback setelah 10 detik
     }
-  }, [paymentConfirmModal, customerData, fetchCustomerData, formatCurrency, closePaymentConfirmation]);
+  }, [paymentConfirmModal, customerData, fetchCustomerData, formatCurrency, closePaymentConfirmation, registerInvoiceToWebSocket, addRecentPayment]);
 
   const handlePayNow = useCallback((invoice) => {
     if (!invoice || !invoice.invoice) {
@@ -673,6 +1040,27 @@ const CustomerDashboard = () => {
     ?.filter(inv => inv.status === 'UNPAID')
     ?.reduce((sum, inv) => sum + (inv.total || 0), 0) || 0;
 
+  // WebSocket Status Indicator Component
+  const WebSocketStatus = () => {
+    const ws = wsRef.current;
+    const isConnected = ws?.readyState === WebSocket.OPEN;
+    
+    return (
+      <div className="fixed bottom-4 right-4 z-50">
+        <div className={`flex items-center px-3 py-2 rounded-full shadow-lg ${
+          isConnected ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+        }`}>
+          <div className={`w-3 h-3 rounded-full mr-2 ${
+            isConnected ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
+          }`} />
+          <span className="text-sm font-medium">
+            {isConnected ? 'Real-time Active' : 'Connecting...'}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
@@ -707,6 +1095,9 @@ const CustomerDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100">
+      {/* WebSocket Status Indicator */}
+      <WebSocketStatus />
+
       {/* Payment Confirmation Modal */}
       {paymentConfirmModal.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -766,6 +1157,17 @@ const CustomerDashboard = () => {
                   </div>
                 </div>
                 
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                  <div className="flex">
+                    <FaBell className="text-blue-400 mr-3 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-blue-700">
+                        <strong>Real-time Updates:</strong> Setelah pembayaran, status akan diperbarui otomatis melalui WebSocket.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 {paymentConfirmModal.isBulkPayment && (
                   <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
                     <div className="flex">
@@ -821,7 +1223,9 @@ const CustomerDashboard = () => {
               <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
               <h3 className="text-lg font-bold text-gray-900 mb-2">Memproses Pembayaran</h3>
               <p className="text-gray-600">Sedang menghubungkan ke sistem pembayaran...</p>
-              <p className="text-sm text-gray-500 mt-4">Harap tunggu sebentar.</p>
+              <p className="text-sm text-gray-500 mt-4">
+                Setelah pembayaran, status akan otomatis diperbarui.
+              </p>
             </div>
           </div>
         </div>
@@ -829,7 +1233,7 @@ const CustomerDashboard = () => {
 
       {/* Payment Error Alert */}
       {paymentError && (
-        <div className="fixed top-4 right-4 z-50 max-w-md">
+        <div className="fixed top-4 right-4 z-50 max-w-md animate-fade-in">
           <div className="bg-red-50 border-l-4 border-red-400 p-4 shadow-lg">
             <div className="flex">
               <FaExclamationCircle className="text-red-400 mr-3 flex-shrink-0" />
@@ -848,15 +1252,17 @@ const CustomerDashboard = () => {
         </div>
       )}
 
-      {/* Payment Success Alert */}
+      {/* Payment Success Alert (from WebSocket) */}
       {paymentSuccess && (
-        <div className="fixed top-4 right-4 z-50 max-w-md">
+        <div className="fixed top-4 right-4 z-50 max-w-md animate-fade-in">
           <div className="bg-green-50 border-l-4 border-green-400 p-4 shadow-lg">
             <div className="flex">
               <FaCheckCircle className="text-green-400 mr-3 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-green-800">Pembayaran Berhasil Diproses</p>
-                <p className="text-sm text-green-700 mt-1">Silakan lanjutkan pembayaran di jendela DOKU Checkout yang muncul.</p>
+                <p className="text-sm font-medium text-green-800">Pembayaran Diproses</p>
+                <p className="text-sm text-green-700 mt-1">
+                  Status tagihan sedang diperbarui...
+                </p>
                 <button
                   onClick={() => setPaymentSuccess(false)}
                   className="mt-2 text-sm text-green-600 hover:text-green-800"
