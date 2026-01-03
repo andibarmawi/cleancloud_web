@@ -208,32 +208,7 @@ const PaymentModal = ({ paymentUrl, description, onClose }) => {
                 />
               </div>
               
-              {/* Instructions */}
-              <div className="mt-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                  <div className="flex items-center bg-green-50 p-3 rounded-lg">
-                    <FaCheckCircle className="text-green-500 mr-2 flex-shrink-0" />
-                    <div>
-                      <div className="font-medium text-green-800">Aman & Terenkripsi</div>
-                      <div className="text-green-600 text-xs">Transaksi 100% aman</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center bg-blue-50 p-3 rounded-lg">
-                    <FaBell className="text-blue-500 mr-2 flex-shrink-0" />
-                    <div>
-                      <div className="font-medium text-blue-800">Notifikasi Otomatis</div>
-                      <div className="text-blue-600 text-xs">Status update real-time</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center bg-yellow-50 p-3 rounded-lg">
-                    <FaCalendarAlt className="text-yellow-500 mr-2 flex-shrink-0" />
-                    <div>
-                      <div className="font-medium text-yellow-800">Selesaikan Sekarang</div>
-                      <div className="text-yellow-600 text-xs">Proses cepat 2-3 menit</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              
             </div>
           )}
         </div>
