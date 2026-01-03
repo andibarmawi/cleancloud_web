@@ -16,334 +16,90 @@ import {
   FaArrowLeft,
   FaSpinner,
   FaTruck,
+  FaBath,
   FaBox,
+  FaFire,
   FaBell,
+  FaCaretDown,
+  FaCaretUp,
   FaTimes,
-  FaSync
+  FaExternalLinkAlt,
+  FaLock,
+  FaExpand,
+  FaCompress,
+  FaDesktop,
+  FaMobileAlt
 } from 'react-icons/fa';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { buildApiUrl } from '../apiConfig';
 
-// Constants untuk status WebSocket
+// Constants untuk WebSocket
 const WS_URL = "wss://api.cleancloud.cloud/ws";
 const WS_RECONNECT_DELAY = 5000;
-const POLLING_INTERVAL = 10000;
-const MAX_POLLING_ATTEMPTS = 30;
-
-// Utility functions
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0
-  }).format(amount);
-};
-
-const getPaymentStatusBadge = (status) => {
-  const statusConfig = {
-    'LUNAS': {
-      color: 'bg-green-100 text-green-800',
-      icon: <FaCheckCircle className="mr-1" />,
-      text: 'LUNAS'
-    },
-    'BELUM LUNAS': {
-      color: 'bg-red-100 text-red-800',
-      icon: <FaExclamationCircle className="mr-1" />,
-      text: 'BELUM LUNAS'
-    },
-    'SEBAGIAN': {
-      color: 'bg-yellow-100 text-yellow-800',
-      icon: <FaClock className="mr-1" />,
-      text: 'SEBAGIAN'
-    }
-  };
-
-  const config = statusConfig[status];
-  if (!config) return null;
-
-  return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
-      {config.icon} {config.text}
-    </span>
-  );
-};
-
-const getWorkStatusBadge = (status) => {
-  const statusConfig = {
-    'SORTIR': { color: 'bg-blue-100 text-blue-800', icon: <FaTshirt className="mr-1" /> },
-    'CUCI': { color: 'bg-indigo-100 text-indigo-800', icon: <FaTshirt className="mr-1" /> },
-    'SETRIKA': { color: 'bg-purple-100 text-purple-800', icon: <FaTshirt className="mr-1" /> },
-    'SELESAI': { color: 'bg-green-100 text-green-800', icon: <FaCheckCircle className="mr-1" /> },
-    'PACKING': { color: 'bg-yellow-100 text-yellow-800', icon: <FaBox className="mr-1" /> },
-    'PROCESSING': { color: 'bg-orange-100 text-orange-800', icon: <FaSpinner className="mr-1 animate-spin" /> }
-  };
-  
-  const config = statusConfig[status] || { 
-    color: 'bg-gray-100 text-gray-800', 
-    icon: <FaClock className="mr-1" /> 
-  };
-  
-  return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
-      {config.icon} {status}
-    </span>
-  );
-};
-
-// Component untuk WhatsApp Button
-const WhatsAppButton = ({ phone, invoiceNumber, laundryName }) => {
-  if (!phone) return null;
-
-  const formattedPhone = phone.replace(/^0/, "62");
-  const message = `Halo ${laundryName} 👋 Saya ingin menanyakan invoice ${invoiceNumber}`;
-  const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
-    >
-      <FaWhatsapp />
-      WhatsApp
-    </a>
-  );
-};
-
-// Component untuk Error Modal
-const ErrorModal = ({ error, onClose, onRetry }) => {
-  const copyPaymentUrl = () => {
-    if (error.details) {
-      navigator.clipboard.writeText(error.details);
-      alert('URL telah disalin ke clipboard!');
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
-                <FaExclamationCircle className="text-red-600 text-xl" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">{error.title}</h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition"
-              aria-label="Tutup modal"
-            >
-              <FaTimes className="text-xl" />
-            </button>
-          </div>
-          
-          <div className="mb-6">
-            <p className="text-gray-700 mb-3">{error.message}</p>
-            
-            {error.details && (
-              <div className="bg-gray-50 rounded-lg p-3 mt-3">
-                <p className="text-sm font-medium text-gray-600 mb-1">Detail:</p>
-                <p className="text-xs text-gray-500 font-mono break-words">{error.details}</p>
-                
-                {error.title === 'Pop-up Diblokir' && (
-                  <button
-                    onClick={copyPaymentUrl}
-                    className="mt-2 text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    Salin URL Pembayaran
-                  </button>
-                )}
-              </div>
-            )}
-            
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
-              <p className="text-sm text-yellow-700">
-                <FaExclamationCircle className="inline mr-2" />
-                Silakan coba lagi beberapa saat atau hubungi laundry jika masalah berlanjut.
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex space-x-3">
-            {onRetry && (
-              <button
-                onClick={onRetry}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition"
-              >
-                Coba Lagi
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Component untuk Success Modal
-const SuccessModal = ({ success, onClose, onRefresh }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-        <div className="p-6">
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FaCheckCircle className="text-green-600 text-4xl" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">{success.title}</h3>
-            <p className="text-gray-600">{success.message}</p>
-          </div>
-          
-          <div className="bg-green-50 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-center">
-              <FaSpinner className="animate-spin text-green-600 mr-3" />
-              <p className="text-sm text-green-700">
-                Memperbarui status invoice...
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex space-x-3">
-            <button
-              onClick={onRefresh}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition flex items-center justify-center"
-            >
-              <FaSync className="mr-2" />
-              Refresh Status
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Component untuk Loading State
-const LoadingState = () => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
-    <div className="text-center">
-      <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
-      <p className="text-gray-600">Memuat data invoice...</p>
-    </div>
-  </div>
-);
-
-// Component untuk Error State
-const ErrorState = ({ invoiceNumber, onRetry, onNavigateHome }) => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
-    <div className="text-center max-w-md p-8">
-      <FaExclamationCircle className="text-5xl text-red-500 mx-auto mb-4" />
-      <h2 className="text-xl font-bold text-gray-900 mb-2">Invoice Tidak Ditemukan</h2>
-      <p className="text-gray-600 mb-6">
-        Invoice dengan nomor {invoiceNumber} tidak ditemukan atau telah kadaluarsa.
-      </p>
-      <div className="space-y-3">
-        <button
-          onClick={onRetry}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition"
-        >
-          Coba Lagi
-        </button>
-        <button
-          onClick={onNavigateHome}
-          className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
-        >
-          Kembali ke Halaman Utama
-        </button>
-      </div>
-    </div>
-  </div>
-);
-
-// Component untuk Payment Processing Modal
-const PaymentProcessingModal = ({ invoiceNumber, onClose }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
-      <div className="p-6">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaCheckCircle className="text-green-600 text-3xl" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Pembayaran Diproses</h3>
-          <p className="text-gray-600">
-            Anda akan diarahkan ke halaman pembayaran DOKU untuk invoice{' '}
-            <span className="font-semibold">{invoiceNumber}</span>
-          </p>
-        </div>
-        
-        <div className="bg-blue-50 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-700 text-center">
-            <FaBell className="inline mr-2" />
-            Jika halaman tidak terbuka otomatis, periksa pop-up blocker di browser Anda.
-          </p>
-        </div>
-        
-        <button
-          onClick={onClose}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition"
-        >
-          Tutup
-        </button>
-      </div>
-    </div>
-  </div>
-);
 
 const InvoicePage = () => {
-  // Hooks
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const invoiceNumber = searchParams.get('invoice') || '';
   
-  console.log("🚀 [InvoicePage] Component mounted with invoice:", invoiceNumber);
-  console.log("🔗 Current URL:", window.location.href);
-  
-  // Refs
+  // Refs untuk WebSocket
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
-  const paymentPollingRef = useRef(null);
-  const fetchInvoiceDataRef = useRef(null); // Ref untuk menyimpan fungsi terbaru
+  const fetchInvoiceDataRef = useRef(null);
   
-  // State
+  // States
   const [invoiceData, setInvoiceData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState(null);
+  const [expandedTrackingItems, setExpandedTrackingItems] = useState({});
   
-  // Error and Success states
-  const [error, setError] = useState({
+  // Error handling
+  const [errorModal, setErrorModal] = useState({
     show: false,
     title: '',
     message: '',
     details: ''
   });
-  
-  const [success, setSuccess] = useState({
+
+  const [successModal, setSuccessModal] = useState({
     show: false,
     title: '',
     message: ''
   });
 
+  // Helper untuk toggle expanded tracking
+  const toggleTrackingExpansion = (itemId) => {
+    setExpandedTrackingItems(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
+  };
+
+  // WhatsApp Button Component
+  const WhatsAppButton = ({ phone, invoice, laundryName }) => {
+    if (!phone) return null;
+
+    const url = `https://wa.me/${phone.replace(/^0/, "62")}?text=${encodeURIComponent(
+      `Halo ${laundryName} 👋 Saya ingin menanyakan invoice ${invoice}`
+    )}`;
+
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+      >
+        <FaWhatsapp />
+        WhatsApp
+      </a>
+    );
+  };
+
   // Fetch invoice data
   const fetchInvoiceData = useCallback(async () => {
     if (!invoiceNumber) return;
-
-    console.log("📡 [Invoice] Fetching data for invoice:", invoiceNumber);
 
     try {
       setLoading(true);
@@ -359,12 +115,11 @@ const InvoicePage = () => {
         throw new Error(data.message || 'API Error');
       }
       
-      console.log("✅ [Invoice] Data received:", data);
       setInvoiceData(data);
     } catch (error) {
-      console.error('❌ [Invoice] Error fetching data:', error);
+      console.error('Error fetching invoice data:', error);
       
-      setError({
+      setErrorModal({
         show: true,
         title: 'Gagal Memuat Data Invoice',
         message: 'Terjadi kesalahan saat mengambil data invoice dari server.',
@@ -436,17 +191,17 @@ const InvoicePage = () => {
           if (msg.event === "REGISTRATION_ACCEPTED" && msg.data?.noresi === noresi) {
             console.log("🎉 [WebSocket] Payment SUCCESS for invoice:", noresi);
 
-            // Update UI
-            setShowPaymentModal(false);
+            // Close payment modal
+            setPaymentUrl(null);
             
             // Show success modal
-            setSuccess({
+            setSuccessModal({
               show: true,
               title: "Pembayaran Berhasil!",
               message: `Invoice ${noresi} sudah berhasil dibayar dan diverifikasi oleh sistem.`
             });
 
-            // Gunakan ref untuk memanggil fungsi terbaru
+            // Refresh invoice data
             if (fetchInvoiceDataRef.current) {
               console.log("🔄 [WebSocket] Calling fetchInvoiceData via ref");
               fetchInvoiceDataRef.current();
@@ -488,7 +243,7 @@ const InvoicePage = () => {
     }
   }, []);
 
-  // Cleanup WebSocket and polling
+  // Cleanup WebSocket
   const cleanupConnections = useCallback(() => {
     console.log("🧹 Cleaning up connections...");
     
@@ -501,20 +256,22 @@ const InvoicePage = () => {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
-    
-    if (paymentPollingRef.current) {
-      clearInterval(paymentPollingRef.current);
-      paymentPollingRef.current = null;
-    }
   }, []);
 
-  // Handle payment
-  const handlePayment = useCallback(async () => {
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const handlePayment = async () => {
     if (!invoiceData) return;
 
-    // Check if invoice is already paid
+    // Cek apakah invoice sudah lunas
     if (invoiceData.data.invoice.payment_status === 'LUNAS') {
-      setError({
+      setErrorModal({
         show: true,
         title: 'Pembayaran Sudah Lunas',
         message: 'Invoice ini sudah dibayar lunas dan tidak dapat diproses lagi.',
@@ -536,7 +293,7 @@ const InvoicePage = () => {
           id: `USER-${invoiceData.data.invoice.consumer_id}`,
           name: invoiceData.data.invoice.customer_name,
           email: `andibarmawi@gmail.com`,
-          phone: invoiceData.data.invoice.customer_phone || '08123456789'
+          phone: '08123456789'
         },
         additional_info: {
           override_notification_url: "https://api.cleancloud.cloud/payment/notify",
@@ -576,43 +333,27 @@ const InvoicePage = () => {
       }
 
       // Extract payment URL from response
-      let paymentUrl = null;
+      let paymentUrlFromResponse = null;
       const responseToCheck = result.response || result.data || result;
       
       if (responseToCheck?.payment?.url) {
-        paymentUrl = responseToCheck.payment.url;
+        paymentUrlFromResponse = responseToCheck.payment.url;
       } else if (responseToCheck?.payment_url) {
-        paymentUrl = responseToCheck.payment_url;
+        paymentUrlFromResponse = responseToCheck.payment_url;
       } else if (responseToCheck?.url) {
-        paymentUrl = responseToCheck.url;
+        paymentUrlFromResponse = responseToCheck.url;
       }
 
-      if (paymentUrl) {
-        console.log('🔗 [Payment] Payment URL received');
-        
-        // Show payment modal
-        setShowPaymentModal(true);
-        
-        // Open payment in new tab
-        const paymentWindow = window.open(paymentUrl, '_blank', 'noopener,noreferrer,width=800,height=600');
-        
-        if (!paymentWindow) {
-          // If popup blocked, show instructions
-          setError({
-            show: true,
-            title: 'Pop-up Diblokir',
-            message: 'Browser Anda memblokir jendela pembayaran. Silakan izinkan pop-up atau klik tautan di bawah:',
-            details: paymentUrl
-          });
-        }
-        
+      if (paymentUrlFromResponse) {
+        console.log('🔗 [Payment] Payment URL received:', paymentUrlFromResponse);
+        setPaymentUrl(paymentUrlFromResponse);
       } else {
         throw new Error('Payment URL not found in server response');
       }
     } catch (error) {
       console.error('❌ [Payment] Error:', error);
       
-      setError({
+      setErrorModal({
         show: true,
         title: 'Terjadi Kesalahan',
         message: 'Gagal memproses pembayaran. Silakan coba lagi.',
@@ -621,40 +362,585 @@ const InvoicePage = () => {
     } finally {
       setPaymentProcessing(false);
     }
-  }, [invoiceData, invoiceNumber]);
+  };
 
-  // Event handlers
-  const handleErrorClose = useCallback(() => {
-    setError({ show: false, title: '', message: '', details: '' });
-  }, []);
+  // Component untuk Payment Modal yang lebih besar
+  const PaymentModal = ({ invoiceNumber, paymentUrl, onClose }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [showAlternateOption, setShowAlternateOption] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [viewMode, setViewMode] = useState('desktop');
+    const iframeRef = useRef(null);
 
-  const handleErrorRetry = useCallback(() => {
-    handleErrorClose();
-    if (error.title === 'Gagal Memuat Data Invoice') {
+    const handleIframeLoad = () => {
+      setIsLoading(false);
+      console.log('✅ [PaymentModal] Iframe loaded successfully');
+    };
+
+    const handleIframeError = () => {
+      console.error('❌ [PaymentModal] Iframe failed to load');
+      setError('Gagal memuat halaman pembayaran. Silakan coba metode lain.');
+      setIsLoading(false);
+      setShowAlternateOption(true);
+    };
+
+    const handleOpenInNewTab = () => {
+      if (paymentUrl) {
+        window.open(paymentUrl, '_blank', 'noopener,noreferrer');
+        onClose();
+      }
+    };
+
+    const handleCopyPaymentUrl = () => {
+      if (paymentUrl) {
+        navigator.clipboard.writeText(paymentUrl);
+        alert('URL pembayaran telah disalin ke clipboard!');
+      }
+    };
+
+    const toggleFullscreen = () => {
+      setIsFullscreen(!isFullscreen);
+    };
+
+    const toggleViewMode = () => {
+      setViewMode(viewMode === 'desktop' ? 'mobile' : 'desktop');
+    };
+
+    return (
+      <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 ${isFullscreen ? 'z-60' : ''}`}>
+        <div className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col ${
+          isFullscreen ? 'h-[95vh] w-[95vw] max-w-none' : 'max-w-6xl h-[85vh]'
+        }`}>
+          {/* Modal Header */}
+          <div className="p-4 border-b border-gray-200 flex-shrink-0">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                  <FaLock className="text-blue-600 text-xl" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Pembayaran Aman</h3>
+                  <p className="text-sm text-gray-600">Invoice: {invoiceNumber}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                {/* View Mode Toggle */}
+                <button
+                  onClick={toggleViewMode}
+                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition"
+                  title={viewMode === 'desktop' ? 'Switch to Mobile View' : 'Switch to Desktop View'}
+                >
+                  {viewMode === 'desktop' ? <FaMobileAlt /> : <FaDesktop />}
+                </button>
+                
+                {/* Fullscreen Toggle */}
+                <button
+                  onClick={toggleFullscreen}
+                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition"
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                >
+                  {isFullscreen ? <FaCompress /> : <FaExpand />}
+                </button>
+                
+                <button
+                  onClick={onClose}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition"
+                  aria-label="Tutup modal pembayaran"
+                >
+                  <FaTimes className="text-xl" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Security Info */}
+            <div className="mt-3 bg-blue-50 p-3 rounded-lg">
+              <div className="flex items-center justify-center">
+                <FaLock className="text-blue-600 mr-2" />
+                <span className="text-sm text-blue-700">
+                  Transaksi Anda aman dan terenkripsi melalui DOKU Payment Gateway
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Body */}
+          <div className="flex-1 overflow-hidden flex flex-col p-4">
+            {/* Error State */}
+            {error ? (
+              <div className="flex-1 flex items-center justify-center bg-white">
+                <div className="text-center max-w-md">
+                  <FaExclamationCircle className="text-5xl text-red-500 mx-auto mb-4" />
+                  <h4 className="text-lg font-bold text-gray-900 mb-2">Gagal Memuat Pembayaran</h4>
+                  <p className="text-gray-600 mb-6">{error}</p>
+                  
+                  {showAlternateOption && (
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleOpenInNewTab}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition flex items-center justify-center"
+                      >
+                        <FaExternalLinkAlt className="mr-2" />
+                        Buka di Tab Baru
+                      </button>
+                      <button
+                        onClick={handleCopyPaymentUrl}
+                        className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
+                      >
+                        Salin Link Pembayaran
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col relative">
+                {/* Loading Overlay */}
+                {isLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                    <div className="text-center">
+                      <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
+                      <p className="text-gray-600">Memuat halaman pembayaran...</p>
+                      <p className="text-sm text-gray-500 mt-2">Harap tunggu sebentar</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Iframe Container */}
+                <div className={`flex-1 relative overflow-hidden border border-gray-200 rounded-xl ${
+                  viewMode === 'mobile' ? 'max-w-md mx-auto w-full' : 'w-full'
+                }`}>
+                  {/* View Mode Indicator */}
+                  <div className="absolute top-2 right-2 z-10">
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      viewMode === 'mobile' 
+                        ? 'bg-purple-100 text-purple-800' 
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {viewMode === 'mobile' ? 'Mobile View' : 'Desktop View'}
+                    </span>
+                  </div>
+                  
+                  {/* Iframe dengan responsive styling */}
+                  <iframe
+                    ref={iframeRef}
+                    src={paymentUrl}
+                    title="Payment Gateway"
+                    className={`absolute inset-0 w-full h-full border-0 ${
+                      viewMode === 'mobile' ? 'max-w-md mx-auto' : ''
+                    }`}
+                    sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-modals"
+                    allow="payment; fullscreen; autoplay; camera; microphone"
+                    allowFullScreen
+                    onLoad={handleIframeLoad}
+                    onError={handleIframeError}
+                    style={{
+                      minHeight: '600px'
+                    }}
+                  />
+                </div>
+                
+                {/* Instructions */}
+                <div className="mt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                    <div className="flex items-center bg-green-50 p-3 rounded-lg">
+                      <FaCheckCircle className="text-green-500 mr-2 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium text-green-800">Aman & Terenkripsi</div>
+                        <div className="text-green-600 text-xs">Transaksi 100% aman</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center bg-blue-50 p-3 rounded-lg">
+                      <FaBell className="text-blue-500 mr-2 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium text-blue-800">Notifikasi Otomatis</div>
+                        <div className="text-blue-600 text-xs">Status update real-time</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center bg-yellow-50 p-3 rounded-lg">
+                      <FaClock className="text-yellow-500 mr-2 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium text-yellow-800">Selesaikan Sekarang</div>
+                        <div className="text-yellow-600 text-xs">Proses cepat 2-3 menit</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Modal Footer */}
+          <div className="p-4 border-t border-gray-200 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+              <div className="mb-3 sm:mb-0">
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium text-blue-600">Tips:</span> Pastikan mengisi semua data dengan benar untuk proses yang lancar
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={toggleViewMode}
+                  className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition flex items-center text-sm"
+                >
+                  {viewMode === 'desktop' ? <FaMobileAlt className="mr-2" /> : <FaDesktop className="mr-2" />}
+                  {viewMode === 'desktop' ? 'Mobile View' : 'Desktop View'}
+                </button>
+                <button
+                  onClick={toggleFullscreen}
+                  className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition flex items-center text-sm"
+                >
+                  {isFullscreen ? <FaCompress className="mr-2" /> : <FaExpand className="mr-2" />}
+                  {isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen'}
+                </button>
+                <button
+                  onClick={handleOpenInNewTab}
+                  className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition flex items-center text-sm"
+                >
+                  <FaExternalLinkAlt className="mr-2" />
+                  Buka di Tab Baru
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Component untuk Success Modal
+  const SuccessModal = () => {
+    const handleClose = () => {
+      setSuccessModal({ show: false, title: '', message: '' });
       fetchInvoiceData();
-    } else if (error.title === 'Gagal Memproses Pembayaran') {
-      handlePayment();
+    };
+
+    const handleRefresh = () => {
+      setSuccessModal({ show: false, title: '', message: '' });
+      fetchInvoiceData();
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FaCheckCircle className="text-green-600 text-4xl" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">{successModal.title}</h3>
+              <p className="text-gray-600">{successModal.message}</p>
+            </div>
+            
+            <div className="bg-green-50 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-center">
+                <FaSpinner className="animate-spin text-green-600 mr-3" />
+                <p className="text-sm text-green-700">
+                  Memperbarui status invoice...
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={handleRefresh}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition flex items-center justify-center"
+              >
+                <FaSpinner className="mr-2" />
+                Refresh Status
+              </button>
+              <button
+                onClick={handleClose}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Component untuk Error Modal
+  const ErrorModal = () => {
+    const handleClose = () => {
+      setErrorModal({
+        show: false,
+        title: '',
+        message: '',
+        details: ''
+      });
+    };
+
+    const handleRetry = () => {
+      handleClose();
+      if (errorModal.title === 'Gagal Memuat Data Invoice') {
+        fetchInvoiceData();
+      } else if (errorModal.title === 'Terjadi Kesalahan') {
+        handlePayment();
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                  <FaExclamationCircle className="text-red-600 text-xl" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">{errorModal.title}</h3>
+              </div>
+              <button
+                onClick={handleClose}
+                className="text-gray-400 hover:text-gray-600 transition"
+                aria-label="Tutup modal"
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-700 mb-3">{errorModal.message}</p>
+              
+              {errorModal.details && (
+                <div className="bg-gray-50 rounded-lg p-3 mt-3">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Detail Error:</p>
+                  <p className="text-xs text-gray-500 font-mono break-words">{errorModal.details}</p>
+                </div>
+              )}
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+                <p className="text-sm text-yellow-700">
+                  <FaExclamationCircle className="inline mr-2" />
+                  Silakan coba lagi beberapa saat atau hubungi laundry jika masalah berlanjut.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex space-x-3">
+              {errorModal.title !== 'Pembayaran Sudah Lunas' && (
+                <button
+                  onClick={handleRetry}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition"
+                >
+                  Coba Lagi
+                </button>
+              )}
+              <button
+                onClick={handleClose}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
+              >
+                Tutup
+              </button>
+            </div>
+            
+            {errorModal.title === 'Gagal Memuat Data Invoice' && (
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => navigate('/')}
+                  className="text-sm text-blue-600 hover:text-blue-800 transition"
+                >
+                  Kembali ke Halaman Utama
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const getPaymentStatusBadge = (status) => {
+    switch(status) {
+      case 'LUNAS':
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+            <FaCheckCircle className="mr-1" /> LUNAS
+          </span>
+        );
+      case 'BELUM LUNAS':
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+            <FaExclamationCircle className="mr-1" /> BELUM LUNAS
+          </span>
+        );
+      case 'SEBAGIAN':
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+            <FaClock className="mr-1" /> SEBAGIAN
+          </span>
+        );
+      default:
+        return null;
     }
-  }, [error.title, fetchInvoiceData, handleErrorClose, handlePayment]);
+  };
 
-  const handleSuccessClose = useCallback(() => {
-    setSuccess({ show: false, title: '', message: '' });
-    fetchInvoiceData();
-  }, [fetchInvoiceData]);
+  const getWorkStatusBadge = (status) => {
+    const statusConfig = {
+      'SORTIR': { color: 'bg-blue-100 text-blue-800', icon: <FaTshirt className="mr-1" /> },
+      'CUCI': { color: 'bg-indigo-100 text-indigo-800', icon: <FaBath className="mr-1" /> },
+      'SETRIKA': { color: 'bg-purple-100 text-purple-800', icon: <FaFire className="mr-1" /> },
+      'SELESAI': { color: 'bg-green-100 text-green-800', icon: <FaCheckCircle className="mr-1" /> },
+      'PACKING': { color: 'bg-yellow-100 text-yellow-800', icon: <FaBox className="mr-1" /> },
+      'PROCESSING': { color: 'bg-orange-100 text-orange-800', icon: <FaSpinner className="mr-1 animate-spin" /> }
+    };
+    
+    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', icon: <FaClock className="mr-1" /> };
+    
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
+        {config.icon} {status}
+      </span>
+    );
+  };
 
-  const handleSuccessRefresh = useCallback(() => {
-    setSuccess({ show: false, title: '', message: '' });
-    fetchInvoiceData();
-  }, [fetchInvoiceData]);
+  const getTrackingStatusIcon = (track) => {
+    if (track.skipped) {
+      return <span className="text-gray-400">—</span>;
+    }
+    if (track.completed) {
+      return <FaCheckCircle size={16} className="text-green-500" />;
+    }
+    if (track.current) {
+      return <FaSpinner className="animate-spin" size={16} />;
+    }
+    return <div className="w-2 h-2 rounded-full bg-gray-400"></div>;
+  };
 
-  const handlePaymentModalClose = useCallback(() => {
-    setShowPaymentModal(false);
-    fetchInvoiceData();
-  }, [fetchInvoiceData]);
+  const getTrackingStatusColor = (track) => {
+    if (track.skipped) return 'text-gray-400';
+    if (track.completed) return 'text-green-700';
+    if (track.current) return 'text-blue-700';
+    return 'text-gray-700';
+  };
 
-  const handleNavigateHome = useCallback(() => {
-    navigate('/');
-  }, [navigate]);
+  // Component untuk menampilkan tracking per item
+  const TrackingTimeline = ({ item }) => {
+    const isExpanded = expandedTrackingItems[item.id];
+    
+    return (
+      <div className="mt-4 border rounded-lg overflow-hidden">
+        <button
+          onClick={() => toggleTrackingExpansion(item.id)}
+          className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex justify-between items-center transition-colors"
+        >
+          <div className="flex items-center">
+            <FaTruck className="mr-3 text-gray-600" />
+            <div className="text-left">
+              <h4 className="font-medium text-gray-900">{item.service_name}</h4>
+              <p className="text-sm text-gray-600">
+                Status: <span className="font-medium">{item.work_status}</span> • 
+                Progress: {item.work_status_progress}%
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center">
+            <span className="text-sm text-gray-500 mr-2">
+              {isExpanded ? 'Sembunyikan' : 'Lihat Detail'}
+            </span>
+            {isExpanded ? <FaCaretUp /> : <FaCaretDown />}
+          </div>
+        </button>
+        
+        {isExpanded && (
+          <div className="p-4 bg-white">
+            <div className="relative">
+              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+              
+              <div className="space-y-4">
+                {item.tracking_history?.map((track, index) => (
+                  <div key={index} className="relative flex items-start">
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center z-10 ${
+                      track.skipped 
+                        ? 'bg-gray-100 border border-gray-300' 
+                        : track.completed 
+                          ? 'bg-green-100 border border-green-300' 
+                          : track.current 
+                            ? 'bg-blue-100 border border-blue-300' 
+                            : 'bg-gray-100 border border-gray-300'
+                    }`}>
+                      {getTrackingStatusIcon(track)}
+                    </div>
+                    
+                    <div className="ml-6 flex-1">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className={`font-medium ${getTrackingStatusColor(track)}`}>
+                            {track.title}
+                            {track.skipped && <span className="ml-2 text-xs text-gray-500">(dilewati)</span>}
+                          </h4>
+                          <p className="text-sm text-gray-600 mt-1">{track.description}</p>
+                        </div>
+                        <div className="text-sm text-gray-500">{track.timestamp}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Component untuk progress ringkasan keseluruhan
+  const OverallProgress = () => {
+    if (!invoiceData?.data?.invoice?.overall_tracking) return null;
+    
+    const overall = invoiceData.data.invoice.overall_tracking;
+    
+    return (
+      <div className="mb-8 bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900 flex items-center">
+            <FaTruck className="mr-2 text-purple-600" />
+            Progress Keseluruhan Pesanan
+          </h3>
+          <div className="text-lg font-bold text-blue-600">{overall.overall_progress}%</div>
+        </div>
+        
+        <div className="mb-4">
+          <div className="w-full bg-gray-200 rounded-full h-4">
+            <div 
+              className="bg-gradient-to-r from-blue-500 to-purple-600 h-4 rounded-full transition-all duration-500"
+              style={{ width: `${overall.overall_progress}%` }}
+            ></div>
+          </div>
+          <div className="flex justify-between text-sm text-gray-600 mt-2">
+            <span>Mulai</span>
+            <span>{overall.overall_progress}%</span>
+            <span>Selesai</span>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="text-gray-600">Status Saat Ini</div>
+            <div className="font-medium">{overall.current_stage}</div>
+          </div>
+          <div className="bg-blue-50 p-3 rounded-lg">
+            <div className="text-blue-600">Estimasi Selesai</div>
+            <div className="font-medium">{invoiceData.data.invoice.estimated_finished}</div>
+          </div>
+          <div className="bg-green-50 p-3 rounded-lg">
+            <div className="text-green-600">Proses Berikutnya</div>
+            <div className="font-medium">{overall.next_estimated_time}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Initialize WebSocket when invoice data is available
   useEffect(() => {
@@ -727,35 +1013,49 @@ const InvoicePage = () => {
     }
   }, [invoiceNumber, fetchInvoiceData]);
 
-  // Debug: log state changes
-  useEffect(() => {
-    console.log("🔄 [STATE] invoiceData updated:", invoiceData ? "YES" : "NO");
-  }, [invoiceData]);
-
-  // Loading state
   if (loading) {
-    console.log("⏳ [UI] Showing loading state");
-    return <LoadingState />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Memuat data invoice...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Error state
-  if (!invoiceData || !invoiceData.data) {
-    console.log("❌ [UI] Showing error state - no invoice data");
+  // Jika data invoice tidak ada (error saat fetch)
+  if (!invoiceData) {
     return (
-      <ErrorState
-        invoiceNumber={invoiceNumber}
-        onRetry={fetchInvoiceData}
-        onNavigateHome={handleNavigateHome}
-      />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center max-w-md p-8">
+          <FaExclamationCircle className="text-5xl text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Gagal Memuat Invoice</h2>
+          <p className="text-gray-600 mb-6">
+            Tidak dapat memuat data invoice. Silakan coba lagi atau hubungi laundry untuk bantuan.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={fetchInvoiceData}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition"
+            >
+              Coba Lagi
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
+            >
+              Kembali ke Halaman Utama
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
   const invoice = invoiceData.data.invoice;
   const laundry = invoice.laundry;
   const isPaid = invoice.payment_status === 'LUNAS';
-
-  console.log("✅ [UI] Rendering invoice page for:", invoice.invoice_number);
-  console.log("💰 Payment status:", invoice.payment_status);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100">
@@ -767,7 +1067,6 @@ const InvoicePage = () => {
               <button 
                 onClick={() => navigate(-1)}
                 className="mr-4 text-gray-600 hover:text-blue-600 transition"
-                aria-label="Kembali"
               >
                 <FaArrowLeft className="text-xl" />
               </button>
@@ -776,13 +1075,18 @@ const InvoicePage = () => {
                 <p className="text-sm text-gray-600">Detail transaksi dan pembayaran</p>
               </div>
             </div>
-            <div className="text-sm text-gray-500">
-              <FaSync 
-                onClick={fetchInvoiceData} 
-                className="cursor-pointer hover:text-blue-600 transition"
-                title="Refresh data"
-                aria-label="Refresh data"
-              />
+            {/* Real-time Status Indicator */}
+            <div className="flex items-center text-sm">
+              <div className={`w-3 h-3 rounded-full mr-2 ${
+                wsRef.current?.readyState === WebSocket.OPEN 
+                  ? 'bg-green-500 animate-pulse' 
+                  : 'bg-gray-400'
+              }`} />
+              <span className="text-gray-600">
+                {wsRef.current?.readyState === WebSocket.OPEN 
+                  ? 'Terhubung ke server pembayaran' 
+                  : 'Menghubungkan...'}
+              </span>
             </div>
           </div>
         </div>
@@ -798,13 +1102,9 @@ const InvoicePage = () => {
                 <FaFileInvoice className="text-2xl mr-3" />
                 <h1 className="text-2xl font-bold">INVOICE</h1>
               </div>
-              <p className="text-blue-100">
-                Nomor: <span className="font-mono font-bold">{invoice.invoice_number}</span>
-              </p>
+              <p className="text-blue-100">Nomor: <span className="font-mono font-bold">{invoice.invoice_number}</span></p>
               <p className="text-blue-100 text-sm mt-1">Tanggal: {invoice.created_at}</p>
-              <p className="text-blue-100 text-sm">
-                Jumlah Item: {invoice.items.length} jenis layanan
-              </p>
+              <p className="text-blue-100 text-sm">Jumlah Item: {invoice.items.length} jenis layanan</p>
             </div>
             
             <div className="mt-4 md:mt-0">
@@ -870,11 +1170,11 @@ const InvoicePage = () => {
                     <p className="font-medium">{laundry.phone}</p>
                   </div>
 
-                  {/* WhatsApp Button */}
+                  {/* Tombol Chat WhatsApp */}
                   <div className="mt-4">
                     <WhatsAppButton
                       phone={laundry.phone}
-                      invoiceNumber={invoice.invoice_number}
+                      invoice={invoice.invoice_number}
                       laundryName={laundry.name}
                     />
                   </div>
@@ -955,9 +1255,7 @@ const InvoicePage = () => {
                                   style={{ width: `${item.work_status_progress}%` }}
                                 ></div>
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                {item.work_status_progress}% selesai
-                              </div>
+                              <div className="text-xs text-gray-500 mt-1">{item.work_status_progress}% selesai</div>
                             </div>
                           )}
                         </td>
@@ -965,6 +1263,54 @@ const InvoicePage = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            {/* Tracking Section */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-semibold text-gray-900 flex items-center">
+                  <FaTruck className="mr-2 text-purple-600" />
+                  Tracking Detail per Item
+                </h3>
+                <div className="text-sm text-gray-600 flex items-center">
+                  <FaBell className="mr-2" />
+                  <span className="font-medium">Estimasi Selesai:</span> {invoice.estimated_finished}
+                </div>
+              </div>
+              
+              {/* Overall Progress */}
+              <OverallProgress />
+              
+              {/* Individual Item Tracking */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-700 mb-3">Detail Tracking per Layanan:</h4>
+                {invoice.items.map((item) => (
+                  <TrackingTimeline key={item.id} item={item} />
+                ))}
+              </div>
+              
+              {/* Tracking Legend */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h5 className="text-sm font-medium text-gray-700 mb-3">Keterangan Status:</h5>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                    <span className="text-xs text-gray-600">Selesai</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                    <span className="text-xs text-gray-600">Sedang Berjalan</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-gray-400 mr-2"></div>
+                    <span className="text-xs text-gray-600">Belum Dimulai</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 border border-gray-400 rounded-full bg-gray-100 mr-2"></div>
+                    <span className="text-xs text-gray-600">Dilewati</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -999,9 +1345,7 @@ const InvoicePage = () => {
                     </div>
                     <div className="flex items-center">
                       <FaClock className="mr-2" />
-                      <span>
-                        Status: {invoice.payment_status === 'LUNAS' ? 'LUNAS' : 'BELUM LUNAS'}
-                      </span>
+                      <span>Status: {invoice.payment_status === 'LUNAS' ? 'LUNAS' : 'BELUM LUNAS'}</span>
                     </div>
                     <div className="flex items-center mt-2">
                       <FaBox className="mr-2" />
@@ -1042,7 +1386,7 @@ const InvoicePage = () => {
                     {paymentProcessing ? (
                       <>
                         <FaSpinner className="animate-spin mr-3" />
-                        Mengarahkan ke Payment Gateway...
+                        Memproses Pembayaran...
                       </>
                     ) : (
                       <>
@@ -1055,37 +1399,37 @@ const InvoicePage = () => {
               </div>
             </div>
 
-            {/* Real-time Status Indicator */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-              <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
-                <FaBell className="mr-2" />
-                Status Real-time
-              </h3>
-              <p className="text-sm text-blue-700 mb-4">
-                Sistem akan memberi notifikasi otomatis ketika pembayaran berhasil diverifikasi.
-              </p>
-              <div className="flex items-center text-sm">
-                <div className={`w-3 h-3 rounded-full mr-2 ${
-                  wsRef.current?.readyState === WebSocket.OPEN 
-                    ? 'bg-green-500 animate-pulse' 
-                    : 'bg-gray-400'
-                }`} />
-                <span className="text-blue-600">
-                  {wsRef.current?.readyState === WebSocket.OPEN 
-                    ? 'Terhubung ke server pembayaran' 
-                    : 'Menghubungkan...'}
-                </span>
-              </div>
+            {/* Important Notes */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+              <h3 className="font-semibold text-yellow-800 mb-3">Catatan Penting</h3>
+              <ul className="space-y-2 text-sm text-yellow-700">
+                <li className="flex items-start">
+                  <FaExclamationCircle className="mr-2 mt-0.5 flex-shrink-0" />
+                  <span>Setiap item dapat memiliki progress berbeda</span>
+                </li>
+                <li className="flex items-start">
+                  <FaExclamationCircle className="mr-2 mt-0.5 flex-shrink-0" />
+                  <span>Pembayaran akan meng-cover semua item</span>
+                </li>
+                <li className="flex items-start">
+                  <FaExclamationCircle className="mr-2 mt-0.5 flex-shrink-0" />
+                  <span>Item dapat diambil secara bertahap</span>
+                </li>
+                <li className="flex items-start">
+                  <FaExclamationCircle className="mr-2 mt-0.5 flex-shrink-0" />
+                  <span>Untuk pertanyaan, hubungi: {laundry.phone}</span>
+                </li>
+              </ul>
             </div>
 
-            {/* Payment Info */}
+            {/* Payment Info - hanya tampil jika belum lunas */}
             {!isPaid && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-                <h3 className="font-semibold text-yellow-800 mb-3">Pembayaran via CleanCloud</h3>
-                <p className="text-sm text-yellow-700 mb-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                <h3 className="font-semibold text-blue-900 mb-3">Pembayaran via CleanCloud</h3>
+                <p className="text-sm text-blue-700 mb-4">
                   Semua pembayaran diproses melalui sistem payment gateway CleanCloud yang aman dan terpercaya.
                 </p>
-                <div className="text-xs text-yellow-600">
+                <div className="text-xs text-blue-600">
                   <div className="flex items-center mb-1">
                     <FaCheckCircle className="mr-2" />
                     <span>Transaksi aman & terenkripsi</span>
@@ -1102,49 +1446,61 @@ const InvoicePage = () => {
               </div>
             )}
 
-            {/* Important Notes */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">Catatan Penting</h3>
-              <ul className="space-y-2 text-sm text-gray-700">
-                <li className="flex items-start">
-                  <FaExclamationCircle className="mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Pembayaran akan meng-cover semua item dalam invoice</span>
-                </li>
-                <li className="flex items-start">
-                  <FaExclamationCircle className="mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Untuk pertanyaan, hubungi: {laundry.phone}</span>
-                </li>
-                <li className="flex items-start">
-                  <FaExclamationCircle className="mr-2 mt-0.5 flex-shrink-0" />
-                  <span>Simpan invoice ini sebagai bukti transaksi</span>
-                </li>
-              </ul>
-            </div>
+            {/* Status Info tambahan jika sudah lunas */}
+            {isPaid && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                <h3 className="font-semibold text-green-900 mb-3 flex items-center">
+                  <FaCheckCircle className="mr-2" />
+                  Status Pembayaran
+                </h3>
+                <p className="text-sm text-green-700 mb-4">
+                  Pembayaran invoice ini sudah lunas dan telah dikonfirmasi oleh sistem.
+                </p>
+                <div className="text-xs text-green-600">
+                  <div className="flex items-center mb-1">
+                    <FaCheckCircle className="mr-2" />
+                    <span>Pembayaran sudah diterima</span>
+                  </div>
+                  <div className="flex items-center mb-1">
+                    <FaCheckCircle className="mr-2" />
+                    <span>Status pembayaran: LUNAS</span>
+                  </div>
+                  <div className="flex items-center">
+                    <FaCheckCircle className="mr-2" />
+                    <span>Pesanan dapat diambil sesuai jadwal</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Modals */}
-      {showPaymentModal && (
-        <PaymentProcessingModal
+      {/* Payment Modal */}
+      {paymentUrl && (
+        <PaymentModal
           invoiceNumber={invoice.invoice_number}
-          onClose={handlePaymentModalClose}
+          paymentUrl={paymentUrl}
+          onClose={() => {
+            setPaymentUrl(null);
+            fetchInvoiceData();
+          }}
+          onPaymentSuccess={() => {
+            setPaymentUrl(null);
+            setSuccessModal({
+              show: true,
+              title: "Pembayaran Berhasil!",
+              message: "Pembayaran Anda telah berhasil diproses."
+            });
+          }}
         />
       )}
-      {success.show && (
-        <SuccessModal
-          success={success}
-          onClose={handleSuccessClose}
-          onRefresh={handleSuccessRefresh}
-        />
-      )}
-      {error.show && (
-        <ErrorModal
-          error={error}
-          onClose={handleErrorClose}
-          onRetry={handleErrorRetry}
-        />
-      )}
+      
+      {/* Success Modal */}
+      {successModal.show && <SuccessModal />}
+      
+      {/* Error Modal */}
+      {errorModal.show && <ErrorModal />}
 
       {/* Footer */}
       <div className="bg-gray-800 text-white py-6">

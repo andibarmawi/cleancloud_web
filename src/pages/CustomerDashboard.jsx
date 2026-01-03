@@ -20,7 +20,14 @@ import {
   FaBell,
   FaTshirt,
   FaMoneyCheck,
-  FaWhatsapp 
+  FaWhatsapp,
+  FaExternalLinkAlt,
+  FaLock,
+  FaExpand,
+  FaCompress,
+  FaDesktop,
+  FaMobileAlt,
+  FaTimes
 } from 'react-icons/fa';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { buildApiUrl } from "../apiConfig";
@@ -31,6 +38,259 @@ const WS_RECONNECT_DELAY = 5000;
 const WS_HEARTBEAT_INTERVAL = 30000; // 30 detik
 const WS_CONNECTION_TIMEOUT = 10000; // 10 detik
 const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Component untuk Payment Modal yang lebih besar
+const PaymentModal = ({ paymentUrl, isBulkPayment, description, onClose }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showAlternateOption, setShowAlternateOption] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState('desktop');
+  const iframeRef = useRef(null);
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+    console.log('✅ [PaymentModal] Iframe loaded successfully');
+  };
+
+  const handleIframeError = () => {
+    console.error('❌ [PaymentModal] Iframe failed to load');
+    setError('Gagal memuat halaman pembayaran. Silakan coba metode lain.');
+    setIsLoading(false);
+    setShowAlternateOption(true);
+  };
+
+  const handleOpenInNewTab = () => {
+    if (paymentUrl) {
+      window.open(paymentUrl, '_blank', 'noopener,noreferrer');
+      onClose();
+    }
+  };
+
+  const handleCopyPaymentUrl = () => {
+    if (paymentUrl) {
+      navigator.clipboard.writeText(paymentUrl);
+      alert('URL pembayaran telah disalin ke clipboard!');
+    }
+  };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  const toggleViewMode = () => {
+    setViewMode(viewMode === 'desktop' ? 'mobile' : 'desktop');
+  };
+
+  return (
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 ${isFullscreen ? 'z-60' : ''}`}>
+      <div className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col ${
+        isFullscreen ? 'h-[95vh] w-[95vw] max-w-none' : 'max-w-6xl h-[85vh]'
+      }`}>
+        {/* Modal Header */}
+        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                <FaLock className="text-blue-600 text-xl" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {isBulkPayment ? 'Pembayaran Bulk' : 'Pembayaran Invoice'}
+                </h3>
+                <p className="text-sm text-gray-600">{description}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {/* View Mode Toggle */}
+              <button
+                onClick={toggleViewMode}
+                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition"
+                title={viewMode === 'desktop' ? 'Switch to Mobile View' : 'Switch to Desktop View'}
+              >
+                {viewMode === 'desktop' ? <FaMobileAlt /> : <FaDesktop />}
+              </button>
+              
+              {/* Fullscreen Toggle */}
+              <button
+                onClick={toggleFullscreen}
+                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              >
+                {isFullscreen ? <FaCompress /> : <FaExpand />}
+              </button>
+              
+              <button
+                onClick={onClose}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition"
+                aria-label="Tutup modal pembayaran"
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Security Info */}
+          <div className="mt-3 bg-blue-50 p-3 rounded-lg">
+            <div className="flex items-center justify-center">
+              <FaLock className="text-blue-600 mr-2" />
+              <span className="text-sm text-blue-700">
+                Transaksi Anda aman dan terenkripsi melalui DOKU Payment Gateway
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Modal Body */}
+        <div className="flex-1 overflow-hidden flex flex-col p-4">
+          {/* Error State */}
+          {error ? (
+            <div className="flex-1 flex items-center justify-center bg-white">
+              <div className="text-center max-w-md">
+                <FaExclamationCircle className="text-5xl text-red-500 mx-auto mb-4" />
+                <h4 className="text-lg font-bold text-gray-900 mb-2">Gagal Memuat Pembayaran</h4>
+                <p className="text-gray-600 mb-6">{error}</p>
+                
+                {showAlternateOption && (
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleOpenInNewTab}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition flex items-center justify-center"
+                    >
+                      <FaExternalLinkAlt className="mr-2" />
+                      Buka di Tab Baru
+                    </button>
+                    <button
+                      onClick={handleCopyPaymentUrl}
+                      className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
+                    >
+                      Salin Link Pembayaran
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col relative">
+              {/* Loading Overlay */}
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                  <div className="text-center">
+                    <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
+                    <p className="text-gray-600">Memuat halaman pembayaran...</p>
+                    <p className="text-sm text-gray-500 mt-2">Harap tunggu sebentar</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Iframe Container */}
+              <div className={`flex-1 relative overflow-hidden border border-gray-200 rounded-xl ${
+                viewMode === 'mobile' ? 'max-w-md mx-auto w-full' : 'w-full'
+              }`}>
+                {/* View Mode Indicator */}
+                <div className="absolute top-2 right-2 z-10">
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    viewMode === 'mobile' 
+                      ? 'bg-purple-100 text-purple-800' 
+                      : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {viewMode === 'mobile' ? 'Mobile View' : 'Desktop View'}
+                  </span>
+                </div>
+                
+                {/* Iframe dengan responsive styling */}
+                <iframe
+                  ref={iframeRef}
+                  src={paymentUrl}
+                  title="Payment Gateway"
+                  className={`absolute inset-0 w-full h-full border-0 ${
+                    viewMode === 'mobile' ? 'max-w-md mx-auto' : ''
+                  }`}
+                  sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-modals"
+                  allow="payment; fullscreen; autoplay; camera; microphone"
+                  allowFullScreen
+                  onLoad={handleIframeLoad}
+                  onError={handleIframeError}
+                  style={{
+                    minHeight: '600px'
+                  }}
+                />
+              </div>
+              
+              {/* Instructions */}
+              <div className="mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                  <div className="flex items-center bg-green-50 p-3 rounded-lg">
+                    <FaCheckCircle className="text-green-500 mr-2 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium text-green-800">Aman & Terenkripsi</div>
+                      <div className="text-green-600 text-xs">Transaksi 100% aman</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center bg-blue-50 p-3 rounded-lg">
+                    <FaBell className="text-blue-500 mr-2 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium text-blue-800">Notifikasi Otomatis</div>
+                      <div className="text-blue-600 text-xs">Status update real-time</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center bg-yellow-50 p-3 rounded-lg">
+                    <FaClock className="text-yellow-500 mr-2 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium text-yellow-800">Selesaikan Sekarang</div>
+                      <div className="text-yellow-600 text-xs">Proses cepat 2-3 menit</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="p-4 border-t border-gray-200 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+            <div className="mb-3 sm:mb-0">
+              <p className="text-sm text-gray-600">
+                <span className="font-medium text-blue-600">Tips:</span> Pastikan mengisi semua data dengan benar untuk proses yang lancar
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={toggleViewMode}
+                className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition flex items-center text-sm"
+              >
+                {viewMode === 'desktop' ? <FaMobileAlt className="mr-2" /> : <FaDesktop className="mr-2" />}
+                {viewMode === 'desktop' ? 'Mobile View' : 'Desktop View'}
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition flex items-center text-sm"
+              >
+                {isFullscreen ? <FaCompress className="mr-2" /> : <FaExpand className="mr-2" />}
+                {isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen'}
+              </button>
+              <button
+                onClick={handleOpenInNewTab}
+                className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition flex items-center text-sm"
+              >
+                <FaExternalLinkAlt className="mr-2" />
+                Buka di Tab Baru
+              </button>
+              <button
+                onClick={onClose}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const CustomerDashboard = () => {
   const { customerId } = useParams();
@@ -48,6 +308,7 @@ const CustomerDashboard = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState(null);
   
   // State untuk melacak pembayaran terbaru
   const [recentPayments, setRecentPayments] = useState([]);
@@ -386,22 +647,6 @@ const CustomerDashboard = () => {
 
   useEffect(() => {
     fetchCustomerData();
-    
-    // Load DOKU Checkout script jika belum ada
-    if (!window.loadJokulCheckout) {
-      const script = document.createElement('script');
-      script.src = 'https://pay.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js';
-      script.async = true;
-      document.head.appendChild(script);
-      
-      script.onload = () => {
-        console.log('✅ DOKU Checkout script loaded successfully');
-      };
-      
-      script.onerror = () => {
-        console.error('❌ Failed to load DOKU Checkout script');
-      };
-    }
   }, [customerId, fetchCustomerData]);
 
   // Handle WebSocket reconnection when customerId changes
@@ -887,27 +1132,28 @@ const CustomerDashboard = () => {
       if (result.success || (result.response && result.response.payment && result.response.payment.url)) {
         console.log('✅ [PAYMENT] Payment created successfully:', result);
         
-        let paymentUrl = null;
+        let paymentUrlFromResponse = null;
         
         if (result.response && result.response.payment && result.response.payment.url) {
-          paymentUrl = result.response.payment.url;
-          console.log('🔗 [PAYMENT] Found payment URL in result.response.payment.url:', paymentUrl);
+          paymentUrlFromResponse = result.response.payment.url;
+          console.log('🔗 [PAYMENT] Found payment URL in result.response.payment.url:', paymentUrlFromResponse);
         } else if (result.data && result.data.payment_url) {
-          paymentUrl = result.data.payment_url;
-          console.log('🔗 [PAYMENT] Found payment URL in result.data.payment_url:', paymentUrl);
+          paymentUrlFromResponse = result.data.payment_url;
+          console.log('🔗 [PAYMENT] Found payment URL in result.data.payment_url:', paymentUrlFromResponse);
         } else if (result.data && result.data.url) {
-          paymentUrl = result.data.url;
-          console.log('🔗 [PAYMENT] Found payment URL in result.data.url:', paymentUrl);
+          paymentUrlFromResponse = result.data.url;
+          console.log('🔗 [PAYMENT] Found payment URL in result.data.url:', paymentUrlFromResponse);
         } else if (result.payment_url) {
-          paymentUrl = result.payment_url;
-          console.log('🔗 [PAYMENT] Found payment URL in result.payment_url:', paymentUrl);
+          paymentUrlFromResponse = result.payment_url;
+          console.log('🔗 [PAYMENT] Found payment URL in result.payment_url:', paymentUrlFromResponse);
         } else if (result.url) {
-          paymentUrl = result.url;
-          console.log('🔗 [PAYMENT] Found payment URL in result.url:', paymentUrl);
+          paymentUrlFromResponse = result.url;
+          console.log('🔗 [PAYMENT] Found payment URL in result.url:', paymentUrlFromResponse);
         }
 
-        if (paymentUrl) {
-          console.log('🔗 [PAYMENT] Payment URL received:', paymentUrl);
+        if (paymentUrlFromResponse) {
+          console.log('🔗 [PAYMENT] Payment URL received:', paymentUrlFromResponse);
+          setPaymentUrl(paymentUrlFromResponse);
           
           // Register invoice to WebSocket for real-time updates
           if (!isBulkPayment && paymentConfirmModal.invoice?.invoice) {
@@ -922,28 +1168,6 @@ const CustomerDashboard = () => {
               wsRef.current.send(customerMessage);
               console.log("📤 [WebSocket] Registered customer for bulk payment updates");
             }
-          }
-          
-          // Tunggu sedikit untuk memastikan UI tidak freeze
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // Panggil loadJokulCheckout langsung - DOKU akan membuat modal sendiri
-          if (window.loadJokulCheckout) {
-            console.log('🚀 [PAYMENT] Launching DOKU Checkout...');
-            window.loadJokulCheckout(paymentUrl);
-            
-            // Tampilkan success message dengan detail
-            const successMessage = isBulkPayment 
-              ? `Pembayaran untuk ${paymentConfirmModal.unpaidCount} tagihan berhasil dibuat. Silakan lanjutkan pembayaran di DOKU Checkout. Status akan diperbarui otomatis.`
-              : `Pembayaran untuk invoice ${invoiceNumber} berhasil dibuat. Silakan lanjutkan pembayaran di DOKU Checkout. Status akan diperbarui otomatis.`;
-            
-            setTimeout(() => {
-              alert(successMessage);
-            }, 500);
-          } else {
-            console.error('❌ [PAYMENT] DOKU Checkout function not available');
-            // Fallback: open in new tab
-            window.open(paymentUrl, '_blank', 'noopener,noreferrer');
           }
         } else {
           console.warn('⚠️ [PAYMENT] No payment URL found in response');
@@ -1061,6 +1285,11 @@ const CustomerDashboard = () => {
     );
   };
 
+  const handlePaymentModalClose = useCallback(() => {
+    setPaymentUrl(null);
+    fetchCustomerData();
+  }, [fetchCustomerData]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
@@ -1098,6 +1327,22 @@ const CustomerDashboard = () => {
       {/* WebSocket Status Indicator */}
       <WebSocketStatus />
 
+      {/* Payment Modal */}
+      {paymentUrl && (
+        <PaymentModal
+          invoiceNumber={paymentConfirmModal.invoiceNumber}
+          paymentUrl={paymentUrl}
+          isBulkPayment={paymentConfirmModal.isBulkPayment}
+          description={paymentConfirmModal.description}
+          onClose={handlePaymentModalClose}
+          onPaymentSuccess={() => {
+            setPaymentUrl(null);
+            setPaymentSuccess(true);
+            fetchCustomerData();
+          }}
+        />
+      )}
+
       {/* Payment Confirmation Modal */}
       {paymentConfirmModal.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1111,7 +1356,7 @@ const CustomerDashboard = () => {
                   onClick={closePaymentConfirmation}
                   className="text-gray-400 hover:text-gray-600 text-xl"
                 >
-                  ✕
+                  <FaTimes />
                 </button>
               </div>
               
@@ -1216,7 +1461,7 @@ const CustomerDashboard = () => {
       )}
 
       {/* Payment Loading Overlay */}
-      {paymentLoading && (
+      {paymentLoading && !paymentUrl && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full mx-4">
             <div className="text-center">
