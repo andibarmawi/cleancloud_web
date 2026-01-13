@@ -31,6 +31,8 @@ import { buildApiUrl } from "../apiConfig";
 const WS_URL = "wss://api.cleancloud.cloud/ws";
 const WS_RECONNECT_DELAY = 5000;
 
+
+
 // Component untuk Payment Modal yang besar
 const PaymentModal = ({ paymentUrl, description, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -59,6 +61,8 @@ const PaymentModal = ({ paymentUrl, description, onClose }) => {
     }
   };
 
+  
+
   const handleCopyPaymentUrl = () => {
     if (paymentUrl) {
       navigator.clipboard.writeText(paymentUrl);
@@ -73,6 +77,8 @@ const PaymentModal = ({ paymentUrl, description, onClose }) => {
   const toggleViewMode = () => {
     setViewMode(viewMode === 'desktop' ? 'mobile' : 'desktop');
   };
+  
+
 
   return (
     <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 ${isFullscreen ? 'z-60' : ''}`}>
@@ -263,7 +269,7 @@ const CustomersPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState('UNPAID');
   const [sortBy, setSortBy] = useState('name');
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [, setPaymentError] = useState(null);
@@ -570,6 +576,14 @@ const CustomersPage = () => {
         }
       });
   }, [customersData, searchTerm, filterStatus, sortBy]);
+
+  const totalUnpaidFiltered = useMemo(() => {
+  return filteredCustomers.reduce(
+    (sum, customer) => sum + (Number(customer.total_unpaid) || 0),
+    0
+  );
+}, [filteredCustomers]);
+
 
   const handlePayment = async (customer) => {
     try {
@@ -1019,8 +1033,9 @@ const CustomersPage = () => {
                 Daftar Pelanggan ({filteredCustomers.length})
               </h3>
               <div className="text-sm text-gray-600 mt-1 md:mt-0">
-                Total Tunggakan: <span className="font-bold text-red-600">
-                  {formatCurrency(customersData.data.summary.total_unpaid || 0)}
+                Total Tunggakan:{' '}
+                <span className="font-bold text-red-600">
+                  {formatCurrency(totalUnpaidFiltered)}
                 </span>
               </div>
             </div>

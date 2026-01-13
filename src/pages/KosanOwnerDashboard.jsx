@@ -438,50 +438,69 @@ const KosanOwnerDashboard = () => {
   }, []);
 
   // Calculate summary statistics dengan useMemo
-  const summary = useMemo(() => {
-    const items = dashboardData?.data?.items || [];
+  // Calculate summary statistics dengan useMemo
+const summary = useMemo(() => {
+  const items = dashboardData?.data?.items || [];
+  
+  const totalRevenue = items.reduce((sum, item) => {
+    const total = Number(item.total) || 0;
+    return sum + total;
+  }, 0);
+  
+  // UNPAID FEE items - MENGIKUTI LOGIKA BARU
+  const unpaidFeeItems = items.filter(item => {
+    const feeStatus = item.status_fee?.toUpperCase();
+    const paymentStatus = item.status_pembayaran?.toUpperCase();
     
-    const totalRevenue = items.reduce((sum, item) => {
-      const total = Number(item.total) || 0;
-      return sum + total;
-    }, 0);
-    
-    const unpaidFeeItems = items.filter(item => {
-      const status = item.status_fee?.toUpperCase();
-      return status === 'BELUM BAYAR';
-    });
-    
-    const totalUnpaidFeeAmount = unpaidFeeItems.reduce((sum, item) => {
-      const total = Number(item.total) || 0;
-      const commission = total * 0.1;
-      return sum + commission;
-    }, 0);
-    
-    const paidTransactions = items.filter(item => {
-      const status = item.status_pembayaran?.toUpperCase();
-      return status === 'PAID';
-    }).length;
-    
-    const unpaidTransactions = items.filter(item => {
-      const status = item.status_pembayaran?.toUpperCase();
-      return status === 'UNPAID';
-    }).length;
-    
-    const paidFee = items.filter(item => {
-      const status = item.status_fee?.toUpperCase();
-      return status === 'SUDAH BAYAR';
-    }).length;
-    
-    return {
-      totalTransactions: items.length,
-      totalRevenue,
-      unpaidFee: unpaidFeeItems.length,
-      totalUnpaidFeeAmount,
-      paidTransactions,
-      unpaidTransactions,
-      paidFee
-    };
-  }, [dashboardData?.data?.items]);
+    // Filter: fee belum bayar DAN customer sudah lunas
+    return feeStatus === 'BELUM BAYAR' && paymentStatus === 'PAID';
+  });
+  
+  const totalUnpaidFeeAmount = unpaidFeeItems.reduce((sum, item) => {
+    const total = Number(item.total) || 0;
+    const commission = total * 0.1;
+    return sum + commission;
+  }, 0);
+  
+  // LOGIKA LAMA (untuk reference/comparison)
+  const allUnpaidFeeItems = items.filter(item => {
+    const status = item.status_fee?.toUpperCase();
+    return status === 'BELUM BAYAR';
+  });
+  
+  const allTotalUnpaidFeeAmount = allUnpaidFeeItems.reduce((sum, item) => {
+    const total = Number(item.total) || 0;
+    const commission = total * 0.1;
+    return sum + commission;
+  }, 0);
+  
+  const paidTransactions = items.filter(item => {
+    const status = item.status_pembayaran?.toUpperCase();
+    return status === 'PAID';
+  }).length;
+  
+  const unpaidTransactions = items.filter(item => {
+    const status = item.status_pembayaran?.toUpperCase();
+    return status === 'UNPAID';
+  }).length;
+  
+  const paidFee = items.filter(item => {
+    const status = item.status_fee?.toUpperCase();
+    return status === 'SUDAH BAYAR';
+  }).length;
+  
+  return {
+    totalTransactions: items.length,
+    totalRevenue,
+    unpaidFee: unpaidFeeItems.length, // Hanya yang customer sudah lunas
+    totalUnpaidFeeAmount, // Hanya yang customer sudah lunas
+    allUnpaidFee: allUnpaidFeeItems.length, // Semua yang fee belum bayar
+    allTotalUnpaidFeeAmount, // Semua yang fee belum bayar
+    paidTransactions,
+    unpaidTransactions,
+    paidFee
+  };
+}, [dashboardData?.data?.items]);
 
   // Filter and sort items dengan useMemo
   const filteredItems = useMemo(() => {
@@ -1164,6 +1183,7 @@ const KosanOwnerDashboard = () => {
         )}
 
         {/* Financial Summary */}
+        {/* Financial Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Komisi Summary */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-200">
@@ -1174,7 +1194,9 @@ const KosanOwnerDashboard = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
                 <span className="text-gray-700">Total Revenue Kosan</span>
-                <span className="font-bold text-blue-600">{formatCurrency(summary?.totalRevenue || 0)}</span>
+                <span className="font-bold text-blue-600">
+                  {formatCurrency(summary?.totalRevenue || 0)}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                 <span className="text-gray-700">Komisi 10%</span>
@@ -1182,22 +1204,49 @@ const KosanOwnerDashboard = () => {
                   {formatCurrency((summary?.totalRevenue || 0) * 0.1)}
                 </span>
               </div>
+              
+              {/* Fee Belum Dibayar (SEMUA) */}
               <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-                <span className="text-gray-700">Fee Belum Dibayar</span>
+                <div className="flex flex-col">
+                  <span className="text-gray-700">Fee Belum Dibayar (Semua)</span>
+                  <span className="text-xs text-gray-500">
+                    {summary?.allUnpaidFee || 0} transaksi
+                  </span>
+                </div>
                 <span className="font-bold text-yellow-600">
+                  {formatCurrency(summary?.allTotalUnpaidFeeAmount || 0)}
+                </span>
+              </div>
+              
+              {/* Fee Siap Dicairkan (hanya yang customer PAID) */}
+              <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border-l-4 border-orange-400">
+                <div className="flex flex-col">
+                  <span className="text-gray-700 font-medium">Fee Siap Dicairkan</span>
+                  <span className="text-xs text-gray-500">
+                    {summary?.unpaidFee || 0} transaksi • Customer sudah lunas
+                  </span>
+                </div>
+                <span className="font-bold text-orange-600">
                   {formatCurrency(summary?.totalUnpaidFeeAmount || 0)}
                 </span>
               </div>
+              
+              {/* Fee Sudah Diterima */}
               <div className="flex justify-between items-center p-3 bg-green-100 rounded-lg border border-green-200">
-                <span className="text-gray-700 font-medium">Fee Sudah Diterima</span>
+                <div className="flex flex-col">
+                  <span className="text-gray-700 font-medium">Fee Sudah Diterima</span>
+                  <span className="text-xs text-gray-500">
+                    {summary?.paidFee || 0} transaksi
+                  </span>
+                </div>
                 <span className="font-bold text-green-700">
-                  {formatCurrency(((summary?.totalRevenue || 0) * 0.1) - (summary?.totalUnpaidFeeAmount || 0))}
+                  {formatCurrency((summary?.totalRevenue || 0) * 0.1 - (summary?.allTotalUnpaidFeeAmount || 0))}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Quick Actions - DIUBAH menjadi Tombol Pencairan Dana */}
+          {/* Quick Actions */}
           <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-xl shadow-sm p-6 text-white">
             <h4 className="font-semibold mb-4 flex items-center">
               <FaMoneyBill className="mr-2" />
@@ -1212,7 +1261,10 @@ const KosanOwnerDashboard = () => {
                   Fee yang bisa dicairkan
                 </div>
                 <div className="text-xs opacity-75 mt-1">
-                  {summary?.unpaidFee || 0} transaksi
+                  {summary?.unpaidFee || 0} transaksi (dari {summary?.allUnpaidFee || 0} total fee belum bayar)
+                </div>
+                <div className="text-xs opacity-75 mt-1 text-yellow-300">
+                  *Hanya dari transaksi yang customer sudah lunas
                 </div>
               </div>
               

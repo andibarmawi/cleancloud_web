@@ -99,38 +99,56 @@ const InvoicePage = () => {
 
   // Fetch invoice data
   const fetchInvoiceData = useCallback(async () => {
-    if (!invoiceNumber) return;
+  if (!invoiceNumber) {
+    console.warn('[fetchInvoiceData] invoiceNumber kosong');
+    return;
+  }
 
-    try {
-      setLoading(true);
-      const response = await fetch(buildApiUrl(`/public/31/pay/invoice?invoice=${invoiceNumber}`));
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'API Error');
-      }
-      
-      setInvoiceData(data);
-    } catch (error) {
-      console.error('Error fetching invoice data:', error);
-      
-      setErrorModal({
-        show: true,
-        title: 'Gagal Memuat Data Invoice',
-        message: 'Terjadi kesalahan saat mengambil data invoice dari server.',
-        details: error.message
-      });
-      
-      setInvoiceData(null);
-    } finally {
-      setLoading(false);
+  console.group('[fetchInvoiceData]');
+  console.log('Invoice Number:', invoiceNumber);
+
+  try {
+    setLoading(true);
+    console.log('Loading: true');
+
+    const url = buildApiUrl(`/public/31/pay/invoice?invoice=${invoiceNumber}`);
+    console.log('Request URL:', url);
+
+    const response = await fetch(url);
+    console.log('HTTP Status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  }, [invoiceNumber]);
+
+    const data = await response.json();
+    console.log('Raw Response Data:', data);
+
+    if (!data.success) {
+      throw new Error(data.message || 'API Error');
+    }
+
+    console.log('Invoice Data Valid:', data);
+    setInvoiceData(data);
+  } catch (error) {
+    console.error('[fetchInvoiceData] Error:', error);
+    console.error('Error Message:', error.message);
+
+    setErrorModal({
+      show: true,
+      title: 'Gagal Memuat Data Invoice',
+      message: 'Terjadi kesalahan saat mengambil data invoice dari server.',
+      details: error.message
+    });
+
+    setInvoiceData(null);
+  } finally {
+    setLoading(false);
+    console.log('Loading: false');
+    console.groupEnd();
+  }
+}, [invoiceNumber]);
+
 
   // Update ref ketika fungsi berubah
   useEffect(() => {
@@ -1402,7 +1420,7 @@ const InvoicePage = () => {
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
                 <h3 className="font-semibold text-blue-900 mb-3">Pembayaran via CleanCloud</h3>
                 <p className="text-sm text-blue-700 mb-4">
-                  Semua pembayaran diproses melalui sistem payment gateway CleanCloud yang aman dan terpercaya.
+                  Semua pembayaran diproses melalui sistem payment gateway DOKU yang aman dan terpercaya.
                 </p>
                 <div className="text-xs text-blue-600">
                   <div className="flex items-center mb-1">

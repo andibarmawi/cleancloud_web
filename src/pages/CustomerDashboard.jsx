@@ -331,38 +331,58 @@ const CustomerDashboard = () => {
 
   // Fetch customer data
   const fetchCustomerData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch(buildApiUrl(`/public/1/customers/${customerId}`));
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'API Error');
-      }
-      
-      // Validasi dan transformasi data
-      const validatedData = validateAndTransformData(data);
-      setCustomerData(validatedData);
-      
-      console.log("✅ [Customer] Data loaded, customer ID:", customerId);
-      
-    } catch (error) {
-      console.error('❌ [Customer] Error fetching data:', error);
-      setError('Gagal memuat data pelanggan. Silakan coba lagi.');
-      
-      // Mock data untuk development
-      const mockData = createMockData();
-      setCustomerData(mockData);
-    } finally {
-      setLoading(false);
+  console.group('[fetchCustomerData]');
+  console.log('Customer ID:', customerId);
+
+  try {
+    setLoading(true);
+    setError(null);
+    console.log('Loading: true');
+
+    const url = buildApiUrl(`/public/1/customers/${customerId}`);
+    console.log('Request URL:', url);
+
+    const response = await fetch(url);
+    console.log('HTTP Status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  }, [customerId]);
+
+    const data = await response.json();
+    console.log('Raw API Response:', data);
+
+    if (!data.success) {
+      throw new Error(data.message || 'API Error');
+    }
+
+    // Validasi dan transformasi data
+    console.log('Validating & transforming data...');
+    const validatedData = validateAndTransformData(data);
+    console.log('Validated Data:', validatedData);
+
+    setCustomerData(validatedData);
+    console.log('✅ [Customer] Data loaded successfully');
+
+  } catch (error) {
+    console.error('❌ [Customer] Fetch error:', error);
+    console.error('Error message:', error.message);
+
+    setError('Gagal memuat data pelanggan. Silakan coba lagi.');
+
+    // Mock data untuk development
+    console.warn('⚠️ [Customer] Using mock data');
+    const mockData = createMockData();
+    console.log('Mock Data:', mockData);
+
+    setCustomerData(mockData);
+  } finally {
+    setLoading(false);
+    console.log('Loading: false');
+    console.groupEnd();
+  }
+}, [customerId]);
+
 
   // Update ref ketika fungsi berubah
   useEffect(() => {
@@ -2030,13 +2050,7 @@ const CustomerDashboard = () => {
                 </button>
                 
                 {/* Tombol Telepon */}
-                <a 
-                  href={`tel:${customerData?.data?.laundry?.phone || ''}`}
-                  className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-                >
-                  <FaPhone className="mr-2" />
-                  Telepon Laundry
-                </a>
+                
                 
                 {/* Tombol Kembali ke Beranda */}
                 <Link 
