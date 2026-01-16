@@ -9,6 +9,8 @@ import CustomerDashboard from './pages/CustomerDashboard';
 import KosanOwnerDashboard from './pages/KosanOwnerDashboard';
 import KosanOwnerLogin from './pages/KosanOwnerLogin';
 import ProtectedRoute from './components/ProtectedRoute';
+import MitraLandingPage from './pages/MitraLandingPage';
+//import RegistrationSuccess from './pages/RegistrationSuccess'
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -22,7 +24,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/customer/:customerId" element={<CustomerDashboard />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/mitra/:kosanId" element={<CustomersPage />} />
-          
+          <Route path="/mitra/landing" element={<MitraLandingPage />} />
+          {/*<Route path="/pendaftaran-berhasil" element={<RegistrationSuccess />} />
+          */}
           {/* Kosan Owner Login (Public) */}
           <Route path="/kosan-owner/login" element={<KosanOwnerLogin />} />
           

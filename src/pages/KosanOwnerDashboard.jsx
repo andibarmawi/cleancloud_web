@@ -334,7 +334,7 @@ const KosanOwnerDashboard = () => {
   // Fungsi untuk membuka WhatsApp ke admin laundry
   const openWhatsAppToLaundry = useCallback(() => {
     // Nomor admin laundry bisa diambil dari konfigurasi atau API
-    const adminPhone = '6281234567890'; // Ganti dengan nomor admin sebenarnya
+    const adminPhone = '682229600082'; // Ganti dengan nomor admin sebenarnya
     
     // Format nomor untuk WhatsApp
     const phoneNumber = adminPhone.replace(/\D/g, '');
