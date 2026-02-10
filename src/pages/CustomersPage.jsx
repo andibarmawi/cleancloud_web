@@ -22,7 +22,9 @@ import {
   FaMobileAlt,
   FaTimes,
   FaBell,
-  FaSpinner
+  FaSpinner,
+  FaExclamationTriangle,
+  FaArrowRight
 } from 'react-icons/fa';
 import { Link, useParams } from 'react-router-dom';
 import { buildApiUrl } from "../apiConfig";
@@ -31,9 +33,148 @@ import { buildApiUrl } from "../apiConfig";
 const WS_URL = "wss://api.cleancloud.cloud/ws";
 const WS_RECONNECT_DELAY = 5000;
 
+// Component untuk Mobile Redirect Dialog
+const MobileRedirectDialog = ({ paymentUrl, customerName, onClose, onRedirect }) => {
+  const [countdown, setCountdown] = useState(5);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
+  // Deklarasikan handleRedirect SEBELUM useEffect yang menggunakannya
+  const handleRedirect = useCallback(() => {
+    setIsRedirecting(true);
+    if (paymentUrl) {
+      // Simpan informasi untuk kembali ke halaman ini setelah pembayaran
+      sessionStorage.setItem('returnAfterPayment', 'true');
+      sessionStorage.setItem('customerName', customerName);
+      
+      // Redirect ke halaman DOKU
+      window.location.href = paymentUrl;
+    }
+    onRedirect();
+  }, [paymentUrl, customerName, onRedirect]);
 
-// Component untuk Payment Modal yang besar
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleRedirect();
+    }
+  }, [countdown, handleRedirect]); // Tambahkan handleRedirect ke dependency array
+
+  const handleCancel = () => {
+    onClose();
+  };
+
+  const handleOpenInNewTab = () => {
+    if (paymentUrl) {
+      window.open(paymentUrl, '_blank', 'noopener,noreferrer');
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mr-4">
+              <FaExclamationTriangle className="text-yellow-600 text-xl" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Menuju Pembayaran DOKU</h3>
+              <p className="text-sm text-gray-600 mt-1">Untuk pengalaman pembayaran yang optimal</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <div className="flex items-start">
+                <FaExclamationCircle className="text-blue-500 mt-0.5 mr-3" />
+                <div>
+                  <p className="text-sm text-blue-800 font-medium">Perhatian untuk Pengguna Mobile</p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Halaman pembayaran DOKU lebih optimal jika dibuka langsung di browser.
+                    Anda akan diarahkan ke halaman pembayaran DOKU.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-700 mb-2">
+                <span className="font-semibold">Pelanggan:</span> {customerName}
+              </p>
+              <p className="text-xs text-gray-500">
+                Setelah selesai pembayaran, Anda akan dikembalikan ke halaman ini.
+              </p>
+            </div>
+
+            {countdown > 0 ? (
+              <div className="text-center">
+                <p className="text-gray-600 mb-2">
+                  Redirect otomatis dalam:
+                </p>
+                <div className="text-3xl font-bold text-blue-600">
+                  {countdown}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                <p className="text-gray-600">Mengarahkan ke DOKU...</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-col space-y-3">
+            <button
+              onClick={handleRedirect}
+              disabled={isRedirecting}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition flex items-center justify-center disabled:opacity-50"
+            >
+              {isRedirecting ? (
+                <>
+                  <FaSpinner className="animate-spin mr-2" />
+                  Mengarahkan...
+                </>
+              ) : (
+                <>
+                  <FaArrowRight className="mr-2" />
+                  Lanjut ke DOKU Sekarang
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleOpenInNewTab}
+              className="w-full border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium py-3 px-4 rounded-lg transition flex items-center justify-center"
+            >
+              <FaExternalLinkAlt className="mr-2" />
+              Buka di Tab Baru
+            </button>
+
+            <button
+              onClick={handleCancel}
+              className="w-full border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium py-3 px-4 rounded-lg transition"
+            >
+              Batalkan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Component untuk Payment Modal yang besar (untuk desktop)
 const PaymentModal = ({ paymentUrl, description, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -61,8 +202,6 @@ const PaymentModal = ({ paymentUrl, description, onClose }) => {
     }
   };
 
-  
-
   const handleCopyPaymentUrl = () => {
     if (paymentUrl) {
       navigator.clipboard.writeText(paymentUrl);
@@ -77,8 +216,6 @@ const PaymentModal = ({ paymentUrl, description, onClose }) => {
   const toggleViewMode = () => {
     setViewMode(viewMode === 'desktop' ? 'mobile' : 'desktop');
   };
-  
-
 
   return (
     <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 ${isFullscreen ? 'z-60' : ''}`}>
@@ -213,8 +350,6 @@ const PaymentModal = ({ paymentUrl, description, onClose }) => {
                   }}
                 />
               </div>
-              
-              
             </div>
           )}
         </div>
@@ -278,6 +413,7 @@ const CustomersPage = () => {
   const [paymentUrl, setPaymentUrl] = useState(null);
   const [isMobileView, setIsMobileView] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showMobileRedirectDialog, setShowMobileRedirectDialog] = useState(false);
   
   // WebSocket Refs
   const wsRef = useRef(null);
@@ -287,7 +423,23 @@ const CustomersPage = () => {
   // Check screen size
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobileView(window.innerWidth < 768);
+      const isMobile = window.innerWidth < 768;
+      setIsMobileView(isMobile);
+      
+      // Check if returning from payment
+      if (isMobile && sessionStorage.getItem('returnAfterPayment') === 'true') {
+        const customerName = sessionStorage.getItem('customerName');
+        if (customerName) {
+          setPaymentSuccess(true);
+          setTimeout(() => {
+            alert(`✅ Pembayaran untuk ${customerName} berhasil diproses!`);
+          }, 1000);
+        }
+        
+        // Clear session storage
+        sessionStorage.removeItem('returnAfterPayment');
+        sessionStorage.removeItem('customerName');
+      }
     };
     
     checkMobile();
@@ -578,12 +730,11 @@ const CustomersPage = () => {
   }, [customersData, searchTerm, filterStatus, sortBy]);
 
   const totalUnpaidFiltered = useMemo(() => {
-  return filteredCustomers.reduce(
-    (sum, customer) => sum + (Number(customer.total_unpaid) || 0),
-    0
-  );
-}, [filteredCustomers]);
-
+    return filteredCustomers.reduce(
+      (sum, customer) => sum + (Number(customer.total_unpaid) || 0),
+      0
+    );
+  }, [filteredCustomers]);
 
   const handlePayment = async (customer) => {
     try {
@@ -627,8 +778,7 @@ const CustomersPage = () => {
       
       try {
         result = JSON.parse(responseText);
-      // eslint-disable-next-line no-unused-vars
-      } catch (parseError) {
+      } catch {
         throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 100)}`);
       }
 
@@ -652,6 +802,14 @@ const CustomersPage = () => {
             wsRef.current.send(customerMessage);
             console.log("📤 [WebSocket] Registered customer for updates:", customer.id);
           }
+          
+          // Mobile: Show redirect dialog
+          // Desktop: Show iframe modal
+          if (isMobileView) {
+            setShowMobileRedirectDialog(true);
+          }
+          // Desktop akan langsung menampilkan iframe melalui kondisi rendering
+          
         } else {
           throw new Error('URL pembayaran tidak ditemukan dalam response server');
         }
@@ -678,6 +836,19 @@ const CustomersPage = () => {
     setCurrentCustomer(null);
     // Refresh data setelah modal ditutup
     fetchCustomersData();
+  };
+
+  const handleMobileRedirectDialogClose = () => {
+    setShowMobileRedirectDialog(false);
+    setPaymentUrl(null);
+    setCurrentCustomer(null);
+    // Refresh data setelah dialog ditutup
+    fetchCustomersData();
+  };
+
+  const handleMobileRedirect = () => {
+    // Logika redirect sudah ada di dalam komponen MobileRedirectDialog
+    console.log('Redirecting to DOKU payment page');
   };
 
   // Success Modal untuk WebSocket notifications
@@ -843,8 +1014,8 @@ const CustomersPage = () => {
       {/* WebSocket Status Indicator */}
       <WebSocketStatus />
 
-      {/* Payment Modal */}
-      {paymentUrl && currentCustomer && (
+      {/* Payment Modal untuk Desktop */}
+      {!isMobileView && paymentUrl && currentCustomer && (
         <PaymentModal
           customerName={currentCustomer.name}
           paymentUrl={paymentUrl}
@@ -855,6 +1026,16 @@ const CustomersPage = () => {
             setPaymentUrl(null);
             setPaymentSuccess(true);
           }}
+        />
+      )}
+
+      {/* Mobile Redirect Dialog */}
+      {isMobileView && showMobileRedirectDialog && paymentUrl && currentCustomer && (
+        <MobileRedirectDialog
+          paymentUrl={paymentUrl}
+          customerName={`${currentCustomer.name} - Kamar ${currentCustomer.room}`}
+          onClose={handleMobileRedirectDialogClose}
+          onRedirect={handleMobileRedirect}
         />
       )}
 
