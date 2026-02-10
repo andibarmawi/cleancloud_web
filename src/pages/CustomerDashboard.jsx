@@ -27,7 +27,9 @@ import {
   FaCompress,
   FaDesktop,
   FaMobileAlt,
-  FaTimes
+  FaTimes,
+  FaExclamationTriangle,
+  FaArrowRight
 } from 'react-icons/fa';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { buildApiUrl } from "../apiConfig";
@@ -39,7 +41,159 @@ const WS_HEARTBEAT_INTERVAL = 30000; // 30 detik
 const WS_CONNECTION_TIMEOUT = 10000; // 10 detik
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-// Component untuk Payment Modal yang lebih besar
+// Component untuk Mobile Redirect Dialog
+const MobileRedirectDialog = ({ paymentUrl, description, onClose, onRedirect }) => {
+  const [countdown, setCountdown] = useState(5);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  // Handle redirect dengan useEffect terpisah
+  const handleRedirect = useCallback(() => {
+    setIsRedirecting(true);
+    if (paymentUrl) {
+      // Simpan informasi untuk kembali ke halaman ini setelah pembayaran
+      sessionStorage.setItem('returnAfterPayment', 'true');
+      sessionStorage.setItem('paymentDescription', description);
+      
+      // Redirect ke halaman DOKU
+      window.location.href = paymentUrl;
+    }
+    onRedirect();
+  }, [paymentUrl, description, onRedirect]);
+
+  // Effect untuk countdown timer
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      // Set flag untuk melakukan redirect
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShouldRedirect(true);
+    }
+  }, [countdown]);
+
+  // Effect untuk melakukan redirect ketika flag di-set
+  useEffect(() => {
+    if (shouldRedirect && !isRedirecting) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleRedirect();
+    }
+  }, [shouldRedirect, isRedirecting, handleRedirect]);
+
+  const handleCancel = () => {
+    onClose();
+  };
+
+  const handleOpenInNewTab = () => {
+    if (paymentUrl) {
+      window.open(paymentUrl, '_blank', 'noopener,noreferrer');
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mr-4">
+              <FaExclamationTriangle className="text-yellow-600 text-xl" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Menuju Pembayaran DOKU</h3>
+              <p className="text-sm text-gray-600 mt-1">Untuk pengalaman pembayaran yang optimal</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <div className="flex items-start">
+                <FaExclamationCircle className="text-blue-500 mt-0.5 mr-3" />
+                <div>
+                  <p className="text-sm text-blue-800 font-medium">Perhatian untuk Pengguna Mobile</p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Halaman pembayaran DOKU lebih optimal jika dibuka langsung di browser.
+                    Anda akan diarahkan ke halaman pembayaran DOKU.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-700 mb-2">
+                <span className="font-semibold">Pembayaran:</span> {description}
+              </p>
+              <p className="text-xs text-gray-500">
+                Setelah selesai pembayaran, Anda akan dikembalikan ke halaman ini.
+              </p>
+            </div>
+
+            {countdown > 0 ? (
+              <div className="text-center">
+                <p className="text-gray-600 mb-2">
+                  Redirect otomatis dalam:
+                </p>
+                <div className="text-3xl font-bold text-blue-600">
+                  {countdown}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                <p className="text-gray-600">Mengarahkan ke DOKU...</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-col space-y-3">
+            <button
+              onClick={() => setShouldRedirect(true)}
+              disabled={isRedirecting}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition flex items-center justify-center disabled:opacity-50"
+            >
+              {isRedirecting ? (
+                <>
+                  <FaSpinner className="animate-spin mr-2" />
+                  Mengarahkan...
+                </>
+              ) : (
+                <>
+                  <FaArrowRight className="mr-2" />
+                  Lanjut ke DOKU Sekarang
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleOpenInNewTab}
+              className="w-full border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium py-3 px-4 rounded-lg transition flex items-center justify-center"
+            >
+              <FaExternalLinkAlt className="mr-2" />
+              Buka di Tab Baru
+            </button>
+
+            <button
+              onClick={handleCancel}
+              className="w-full border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium py-3 px-4 rounded-lg transition"
+            >
+              Batalkan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Component untuk Payment Modal (untuk desktop)
 const PaymentModal = ({ paymentUrl, isBulkPayment, description, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -217,8 +371,6 @@ const PaymentModal = ({ paymentUrl, isBulkPayment, description, onClose }) => {
                   }}
                 />
               </div>
-              
-              
             </div>
           )}
         </div>
@@ -278,12 +430,14 @@ const CustomerDashboard = () => {
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [error, setError] = useState(null);
+  const [isMobileView, setIsMobileView] = useState(false);
   
   // State untuk payment
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState(null);
+  const [showMobileRedirectDialog, setShowMobileRedirectDialog] = useState(false);
   
   // State untuk melacak pembayaran terbaru
   const [recentPayments, setRecentPayments] = useState([]);
@@ -309,6 +463,34 @@ const CustomerDashboard = () => {
   // Ref untuk menyimpan fungsi terbaru
   const fetchCustomerDataRef = useRef(null);
 
+  // Check screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobile = window.innerWidth < 768;
+      setIsMobileView(isMobile);
+      
+      // Check if returning from payment
+      if (isMobile && sessionStorage.getItem('returnAfterPayment') === 'true') {
+        const paymentDescription = sessionStorage.getItem('paymentDescription');
+        if (paymentDescription) {
+          setPaymentSuccess(true);
+          setTimeout(() => {
+            alert(`✅ Pembayaran ${paymentDescription} berhasil diproses!`);
+          }, 1000);
+        }
+        
+        // Clear session storage
+        sessionStorage.removeItem('returnAfterPayment');
+        sessionStorage.removeItem('paymentDescription');
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Fungsi untuk menambahkan invoice yang baru dibayar
   const addRecentPayment = useCallback((invoiceNumber) => {
     setRecentPayments(prev => [...prev, {
@@ -331,58 +513,57 @@ const CustomerDashboard = () => {
 
   // Fetch customer data
   const fetchCustomerData = useCallback(async () => {
-  console.group('[fetchCustomerData]');
-  console.log('Customer ID:', customerId);
+    console.group('[fetchCustomerData]');
+    console.log('Customer ID:', customerId);
 
-  try {
-    setLoading(true);
-    setError(null);
-    console.log('Loading: true');
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('Loading: true');
 
-    const url = buildApiUrl(`/public/1/customers/${customerId}`);
-    console.log('Request URL:', url);
+      const url = buildApiUrl(`/public/1/customers/${customerId}`);
+      console.log('Request URL:', url);
 
-    const response = await fetch(url);
-    console.log('HTTP Status:', response.status, response.statusText);
+      const response = await fetch(url);
+      console.log('HTTP Status:', response.status, response.statusText);
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Raw API Response:', data);
+
+      if (!data.success) {
+        throw new Error(data.message || 'API Error');
+      }
+
+      // Validasi dan transformasi data
+      console.log('Validating & transforming data...');
+      const validatedData = validateAndTransformData(data);
+      console.log('Validated Data:', validatedData);
+
+      setCustomerData(validatedData);
+      console.log('✅ [Customer] Data loaded successfully');
+
+    } catch (error) {
+      console.error('❌ [Customer] Fetch error:', error);
+      console.error('Error message:', error.message);
+
+      setError('Gagal memuat data pelanggan. Silakan coba lagi.');
+
+      // Mock data untuk development
+      console.warn('⚠️ [Customer] Using mock data');
+      const mockData = createMockData();
+      console.log('Mock Data:', mockData);
+
+      setCustomerData(mockData);
+    } finally {
+      setLoading(false);
+      console.log('Loading: false');
+      console.groupEnd();
     }
-
-    const data = await response.json();
-    console.log('Raw API Response:', data);
-
-    if (!data.success) {
-      throw new Error(data.message || 'API Error');
-    }
-
-    // Validasi dan transformasi data
-    console.log('Validating & transforming data...');
-    const validatedData = validateAndTransformData(data);
-    console.log('Validated Data:', validatedData);
-
-    setCustomerData(validatedData);
-    console.log('✅ [Customer] Data loaded successfully');
-
-  } catch (error) {
-    console.error('❌ [Customer] Fetch error:', error);
-    console.error('Error message:', error.message);
-
-    setError('Gagal memuat data pelanggan. Silakan coba lagi.');
-
-    // Mock data untuk development
-    console.warn('⚠️ [Customer] Using mock data');
-    const mockData = createMockData();
-    console.log('Mock Data:', mockData);
-
-    setCustomerData(mockData);
-  } finally {
-    setLoading(false);
-    console.log('Loading: false');
-    console.groupEnd();
-  }
-}, [customerId]);
-
+  }, [customerId]);
 
   // Update ref ketika fungsi berubah
   useEffect(() => {
@@ -512,8 +693,8 @@ const CustomerDashboard = () => {
             console.log("❤️ [WebSocket] Heartbeat response received");
           }
           
-        } catch (err) {
-          console.error("❌ [WebSocket] Parse error:", err, "Raw:", event.data);
+        } catch {
+          console.error("❌ [WebSocket] Parse error, Raw:", event.data);
         }
       };
 
@@ -888,8 +1069,7 @@ const CustomerDashboard = () => {
         day: 'numeric' 
       };
       return date.toLocaleDateString('id-ID', options);
-    } catch (error) {
-      console.error('Error formatting date:', error);
+    } catch {
       return 'Tanggal tidak tersedia';
     }
   }, []);
@@ -1114,8 +1294,8 @@ const CustomerDashboard = () => {
       try {
         result = JSON.parse(responseText);
         console.log('✅ [PAYMENT] Parsed Response:', result);
-      } catch (parseError) {
-        console.error('❌ [PAYMENT] JSON Parse Error:', parseError);
+      } catch {
+        console.error('❌ [PAYMENT] JSON Parse Error');
         throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 100)}`);
       }
 
@@ -1149,6 +1329,12 @@ const CustomerDashboard = () => {
         if (paymentUrlFromResponse) {
           console.log('🔗 [PAYMENT] Payment URL received:', paymentUrlFromResponse);
           setPaymentUrl(paymentUrlFromResponse);
+          
+          // Check if mobile view, show redirect dialog
+          if (isMobileView) {
+            setShowMobileRedirectDialog(true);
+          }
+          // Desktop akan menampilkan iframe melalui PaymentModal
           
           // Register invoice to WebSocket for real-time updates
           if (!isBulkPayment && paymentConfirmModal.invoice?.invoice) {
@@ -1188,7 +1374,7 @@ const CustomerDashboard = () => {
         fetchCustomerData();
       }, 10000); // Fallback setelah 10 detik
     }
-  }, [paymentConfirmModal, customerData, fetchCustomerData, formatCurrency, closePaymentConfirmation, registerInvoiceToWebSocket, addRecentPayment]);
+  }, [paymentConfirmModal, customerData, fetchCustomerData, formatCurrency, closePaymentConfirmation, registerInvoiceToWebSocket, addRecentPayment, isMobileView]);
 
   const handlePayNow = useCallback((invoice) => {
     if (!invoice || !invoice.invoice) {
@@ -1214,6 +1400,17 @@ const CustomerDashboard = () => {
 
     openPaymentConfirmation(null, true);
   }, [customerData, openPaymentConfirmation]);
+
+  const handleMobileRedirectDialogClose = useCallback(() => {
+    setShowMobileRedirectDialog(false);
+    setPaymentUrl(null);
+    fetchCustomerData();
+  }, [fetchCustomerData]);
+
+  const handlePaymentModalClose = useCallback(() => {
+    setPaymentUrl(null);
+    fetchCustomerData();
+  }, [fetchCustomerData]);
 
   // Filter dan sort invoices
   const filteredInvoices = customerData?.data?.invoices
@@ -1280,11 +1477,6 @@ const CustomerDashboard = () => {
     );
   };
 
-  const handlePaymentModalClose = useCallback(() => {
-    setPaymentUrl(null);
-    fetchCustomerData();
-  }, [fetchCustomerData]);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center">
@@ -1322,8 +1514,8 @@ const CustomerDashboard = () => {
       {/* WebSocket Status Indicator */}
       <WebSocketStatus />
 
-      {/* Payment Modal */}
-      {paymentUrl && (
+      {/* Payment Modal untuk Desktop */}
+      {!isMobileView && paymentUrl && (
         <PaymentModal
           invoiceNumber={paymentConfirmModal.invoiceNumber}
           paymentUrl={paymentUrl}
@@ -1334,6 +1526,18 @@ const CustomerDashboard = () => {
             setPaymentUrl(null);
             setPaymentSuccess(true);
             fetchCustomerData();
+          }}
+        />
+      )}
+
+      {/* Mobile Redirect Dialog */}
+      {isMobileView && showMobileRedirectDialog && paymentUrl && (
+        <MobileRedirectDialog
+          paymentUrl={paymentUrl}
+          description={paymentConfirmModal.description}
+          onClose={handleMobileRedirectDialogClose}
+          onRedirect={() => {
+            console.log('Redirecting to DOKU payment page');
           }}
         />
       )}
