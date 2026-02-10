@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { FaWhatsapp } from "react-icons/fa";
 import { 
@@ -28,7 +29,9 @@ import {
   FaExpand,
   FaCompress,
   FaDesktop,
-  FaMobileAlt
+  FaMobileAlt,
+  FaExclamationTriangle,
+  FaArrowRight
 } from 'react-icons/fa';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { buildApiUrl } from '../apiConfig';
@@ -36,6 +39,380 @@ import { buildApiUrl } from '../apiConfig';
 // Constants untuk WebSocket
 const WS_URL = "wss://api.cleancloud.cloud/ws";
 const WS_RECONNECT_DELAY = 5000;
+
+// Component untuk Mobile Redirect Dialog
+const MobileRedirectDialog = ({ paymentUrl, description, onClose, onRedirect }) => {
+  const [countdown, setCountdown] = useState(5);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  // Handle redirect dengan useEffect terpisah
+  const handleRedirect = useCallback(() => {
+    setIsRedirecting(true);
+    if (paymentUrl) {
+      // Simpan informasi untuk kembali ke halaman ini setelah pembayaran
+      sessionStorage.setItem('returnAfterPayment', 'true');
+      sessionStorage.setItem('paymentDescription', description);
+      
+      // Redirect ke halaman DOKU
+      window.location.href = paymentUrl;
+    }
+    onRedirect();
+  }, [paymentUrl, description, onRedirect]);
+
+  // Effect untuk countdown timer
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      // Set flag untuk melakukan redirect
+      setShouldRedirect(true);
+    }
+  }, [countdown]);
+
+  // Effect untuk melakukan redirect ketika flag di-set
+  useEffect(() => {
+    if (shouldRedirect && !isRedirecting) {
+      handleRedirect();
+    }
+  }, [shouldRedirect, isRedirecting, handleRedirect]);
+
+  const handleCancel = () => {
+    onClose();
+  };
+
+  const handleOpenInNewTab = () => {
+    if (paymentUrl) {
+      window.open(paymentUrl, '_blank', 'noopener,noreferrer');
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mr-4">
+              <FaExclamationTriangle className="text-yellow-600 text-xl" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Menuju Pembayaran DOKU</h3>
+              <p className="text-sm text-gray-600 mt-1">Untuk pengalaman pembayaran yang optimal</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <div className="flex items-start">
+                <FaExclamationCircle className="text-blue-500 mt-0.5 mr-3" />
+                <div>
+                  <p className="text-sm text-blue-800 font-medium">Perhatian untuk Pengguna Mobile</p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Halaman pembayaran DOKU lebih optimal jika dibuka langsung di browser.
+                    Anda akan diarahkan ke halaman pembayaran DOKU.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-700 mb-2">
+                <span className="font-semibold">Pembayaran:</span> {description}
+              </p>
+              <p className="text-xs text-gray-500">
+                Setelah selesai pembayaran, Anda akan dikembalikan ke halaman ini.
+              </p>
+            </div>
+
+            {countdown > 0 ? (
+              <div className="text-center">
+                <p className="text-gray-600 mb-2">
+                  Redirect otomatis dalam:
+                </p>
+                <div className="text-3xl font-bold text-blue-600">
+                  {countdown}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                <p className="text-gray-600">Mengarahkan ke DOKU...</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-col space-y-3">
+            <button
+              onClick={() => setShouldRedirect(true)}
+              disabled={isRedirecting}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition flex items-center justify-center disabled:opacity-50"
+            >
+              {isRedirecting ? (
+                <>
+                  <FaSpinner className="animate-spin mr-2" />
+                  Mengarahkan...
+                </>
+              ) : (
+                <>
+                  <FaArrowRight className="mr-2" />
+                  Lanjut ke DOKU Sekarang
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleOpenInNewTab}
+              className="w-full border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium py-3 px-4 rounded-lg transition flex items-center justify-center"
+            >
+              <FaExternalLinkAlt className="mr-2" />
+              Buka di Tab Baru
+            </button>
+
+            <button
+              onClick={handleCancel}
+              className="w-full border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium py-3 px-4 rounded-lg transition"
+            >
+              Batalkan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Component untuk Payment Modal (untuk desktop)
+const PaymentModal = ({ invoiceNumber, paymentUrl, onClose }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showAlternateOption, setShowAlternateOption] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState('desktop');
+  const iframeRef = useRef(null);
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+    console.log('✅ [PaymentModal] Iframe loaded successfully');
+  };
+
+  const handleIframeError = () => {
+    console.error('❌ [PaymentModal] Iframe failed to load');
+    setError('Gagal memuat halaman pembayaran. Silakan coba metode lain.');
+    setIsLoading(false);
+    setShowAlternateOption(true);
+  };
+
+  const handleOpenInNewTab = () => {
+    if (paymentUrl) {
+      window.open(paymentUrl, '_blank', 'noopener,noreferrer');
+      onClose();
+    }
+  };
+
+  const handleCopyPaymentUrl = () => {
+    if (paymentUrl) {
+      navigator.clipboard.writeText(paymentUrl);
+      alert('URL pembayaran telah disalin ke clipboard!');
+    }
+  };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  const toggleViewMode = () => {
+    setViewMode(viewMode === 'desktop' ? 'mobile' : 'desktop');
+  };
+
+  return (
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 ${isFullscreen ? 'z-60' : ''}`}>
+      <div className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col ${
+        isFullscreen ? 'h-[95vh] w-[95vw] max-w-none' : 'max-w-6xl h-[85vh]'
+      }`}>
+        {/* Modal Header */}
+        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                <FaLock className="text-blue-600 text-xl" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Pembayaran Aman</h3>
+                <p className="text-sm text-gray-600">Invoice: {invoiceNumber}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {/* View Mode Toggle */}
+              <button
+                onClick={toggleViewMode}
+                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition"
+                title={viewMode === 'desktop' ? 'Switch to Mobile View' : 'Switch to Desktop View'}
+              >
+                {viewMode === 'desktop' ? <FaMobileAlt /> : <FaDesktop />}
+              </button>
+              
+              {/* Fullscreen Toggle */}
+              <button
+                onClick={toggleFullscreen}
+                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              >
+                {isFullscreen ? <FaCompress /> : <FaExpand />}
+              </button>
+              
+              <button
+                onClick={onClose}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition"
+                aria-label="Tutup modal pembayaran"
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Security Info */}
+          <div className="mt-3 bg-blue-50 p-3 rounded-lg">
+            <div className="flex items-center justify-center">
+              <FaLock className="text-blue-600 mr-2" />
+              <span className="text-sm text-blue-700">
+                Transaksi Anda aman dan terenkripsi melalui DOKU Payment Gateway
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Modal Body */}
+        <div className="flex-1 overflow-hidden flex flex-col p-4">
+          {/* Error State */}
+          {error ? (
+            <div className="flex-1 flex items-center justify-center bg-white">
+              <div className="text-center max-w-md">
+                <FaExclamationCircle className="text-5xl text-red-500 mx-auto mb-4" />
+                <h4 className="text-lg font-bold text-gray-900 mb-2">Gagal Memuat Pembayaran</h4>
+                <p className="text-gray-600 mb-6">{error}</p>
+                
+                {showAlternateOption && (
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleOpenInNewTab}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition flex items-center justify-center"
+                    >
+                      <FaExternalLinkAlt className="mr-2" />
+                      Buka di Tab Baru
+                    </button>
+                    <button
+                      onClick={handleCopyPaymentUrl}
+                      className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
+                    >
+                      Salin Link Pembayaran
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col relative">
+              {/* Loading Overlay */}
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                  <div className="text-center">
+                    <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
+                    <p className="text-gray-600">Memuat halaman pembayaran...</p>
+                    <p className="text-sm text-gray-500 mt-2">Harap tunggu sebentar</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Iframe Container */}
+              <div className={`flex-1 relative overflow-hidden border border-gray-200 rounded-xl ${
+                viewMode === 'mobile' ? 'max-w-md mx-auto w-full' : 'w-full'
+              }`}>
+                {/* View Mode Indicator */}
+                <div className="absolute top-2 right-2 z-10">
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    viewMode === 'mobile' 
+                      ? 'bg-purple-100 text-purple-800' 
+                      : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {viewMode === 'mobile' ? 'Mobile View' : 'Desktop View'}
+                  </span>
+                </div>
+                
+                {/* Iframe dengan responsive styling */}
+                <iframe
+                  ref={iframeRef}
+                  src={paymentUrl}
+                  title="Payment Gateway"
+                  className={`absolute inset-0 w-full h-full border-0 ${
+                    viewMode === 'mobile' ? 'max-w-md mx-auto' : ''
+                  }`}
+                  sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-modals"
+                  allow="payment; fullscreen; autoplay; camera; microphone"
+                  allowFullScreen
+                  onLoad={handleIframeLoad}
+                  onError={handleIframeError}
+                  style={{
+                    minHeight: '600px'
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="p-4 border-t border-gray-200 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+            <div className="mb-3 sm:mb-0">
+              <p className="text-sm text-gray-600">
+                <span className="font-medium text-blue-600">Tips:</span> Pastikan mengisi semua data dengan benar untuk proses yang lancar
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={toggleViewMode}
+                className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition flex items-center text-sm"
+              >
+                {viewMode === 'desktop' ? <FaMobileAlt className="mr-2" /> : <FaDesktop className="mr-2" />}
+                {viewMode === 'desktop' ? 'Mobile View' : 'Desktop View'}
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition flex items-center text-sm"
+              >
+                {isFullscreen ? <FaCompress className="mr-2" /> : <FaExpand className="mr-2" />}
+                {isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen'}
+              </button>
+              <button
+                onClick={handleOpenInNewTab}
+                className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition flex items-center text-sm"
+              >
+                <FaExternalLinkAlt className="mr-2" />
+                Buka di Tab Baru
+              </button>
+              <button
+                onClick={onClose}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const InvoicePage = () => {
   const [searchParams] = useSearchParams();
@@ -53,6 +430,8 @@ const InvoicePage = () => {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState(null);
   const [expandedTrackingItems, setExpandedTrackingItems] = useState({});
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showMobileRedirectDialog, setShowMobileRedirectDialog] = useState(false);
   
   // Error handling
   const [errorModal, setErrorModal] = useState({
@@ -67,6 +446,35 @@ const InvoicePage = () => {
     title: '',
     message: ''
   });
+
+  // Check screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobile = window.innerWidth < 768;
+      setIsMobileView(isMobile);
+      
+      // Check if returning from payment
+      if (isMobile && sessionStorage.getItem('returnAfterPayment') === 'true') {
+        const paymentDescription = sessionStorage.getItem('paymentDescription');
+        if (paymentDescription) {
+          setSuccessModal({
+            show: true,
+            title: "Pembayaran Berhasil!",
+            message: `Pembayaran ${paymentDescription} berhasil diproses!`
+          });
+        }
+        
+        // Clear session storage
+        sessionStorage.removeItem('returnAfterPayment');
+        sessionStorage.removeItem('paymentDescription');
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Helper untuk toggle expanded tracking
   const toggleTrackingExpansion = (itemId) => {
@@ -99,56 +507,55 @@ const InvoicePage = () => {
 
   // Fetch invoice data
   const fetchInvoiceData = useCallback(async () => {
-  if (!invoiceNumber) {
-    console.warn('[fetchInvoiceData] invoiceNumber kosong');
-    return;
-  }
-
-  console.group('[fetchInvoiceData]');
-  console.log('Invoice Number:', invoiceNumber);
-
-  try {
-    setLoading(true);
-    console.log('Loading: true');
-
-    const url = buildApiUrl(`/public/31/pay/invoice?invoice=${invoiceNumber}`);
-    console.log('Request URL:', url);
-
-    const response = await fetch(url);
-    console.log('HTTP Status:', response.status, response.statusText);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (!invoiceNumber) {
+      console.warn('[fetchInvoiceData] invoiceNumber kosong');
+      return;
     }
 
-    const data = await response.json();
-    console.log('Raw Response Data:', data);
+    console.group('[fetchInvoiceData]');
+    console.log('Invoice Number:', invoiceNumber);
 
-    if (!data.success) {
-      throw new Error(data.message || 'API Error');
+    try {
+      setLoading(true);
+      console.log('Loading: true');
+
+      const url = buildApiUrl(`/public/31/pay/invoice?invoice=${invoiceNumber}`);
+      console.log('Request URL:', url);
+
+      const response = await fetch(url);
+      console.log('HTTP Status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Raw Response Data:', data);
+
+      if (!data.success) {
+        throw new Error(data.message || 'API Error');
+      }
+
+      console.log('Invoice Data Valid:', data);
+      setInvoiceData(data);
+    } catch (error) {
+      console.error('[fetchInvoiceData] Error:', error);
+      console.error('Error Message:', error.message);
+
+      setErrorModal({
+        show: true,
+        title: 'Gagal Memuat Data Invoice',
+        message: 'Terjadi kesalahan saat mengambil data invoice dari server.',
+        details: error.message
+      });
+
+      setInvoiceData(null);
+    } finally {
+      setLoading(false);
+      console.log('Loading: false');
+      console.groupEnd();
     }
-
-    console.log('Invoice Data Valid:', data);
-    setInvoiceData(data);
-  } catch (error) {
-    console.error('[fetchInvoiceData] Error:', error);
-    console.error('Error Message:', error.message);
-
-    setErrorModal({
-      show: true,
-      title: 'Gagal Memuat Data Invoice',
-      message: 'Terjadi kesalahan saat mengambil data invoice dari server.',
-      details: error.message
-    });
-
-    setInvoiceData(null);
-  } finally {
-    setLoading(false);
-    console.log('Loading: false');
-    console.groupEnd();
-  }
-}, [invoiceNumber]);
-
+  }, [invoiceNumber]);
 
   // Update ref ketika fungsi berubah
   useEffect(() => {
@@ -227,8 +634,8 @@ const InvoicePage = () => {
               console.error("❌ [WebSocket] fetchInvoiceDataRef is null!");
             }
           }
-        } catch (err) {
-          console.error("❌ [WebSocket] Parse error:", err, "Raw:", event.data);
+        } catch {
+          console.error("❌ [WebSocket] Parse error, Raw:", event.data);
         }
       };
 
@@ -341,8 +748,7 @@ const InvoicePage = () => {
       
       try {
         result = JSON.parse(responseText);
-      // eslint-disable-next-line no-unused-vars
-      } catch (parseError) {
+      } catch {
         throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 100)}`);
       }
 
@@ -365,6 +771,12 @@ const InvoicePage = () => {
       if (paymentUrlFromResponse) {
         console.log('🔗 [Payment] Payment URL received:', paymentUrlFromResponse);
         setPaymentUrl(paymentUrlFromResponse);
+        
+        // Check if mobile view, show redirect dialog
+        if (isMobileView) {
+          setShowMobileRedirectDialog(true);
+        }
+        // Desktop akan menampilkan iframe melalui PaymentModal
       } else {
         throw new Error('Payment URL not found in server response');
       }
@@ -382,231 +794,16 @@ const InvoicePage = () => {
     }
   };
 
-  // Component untuk Payment Modal yang lebih besar
-  const PaymentModal = ({ invoiceNumber, paymentUrl, onClose }) => {
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [showAlternateOption, setShowAlternateOption] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [viewMode, setViewMode] = useState('desktop');
-    const iframeRef = useRef(null);
+  const handleMobileRedirectDialogClose = useCallback(() => {
+    setShowMobileRedirectDialog(false);
+    setPaymentUrl(null);
+    fetchInvoiceData();
+  }, [fetchInvoiceData]);
 
-    const handleIframeLoad = () => {
-      setIsLoading(false);
-      console.log('✅ [PaymentModal] Iframe loaded successfully');
-    };
-
-    const handleIframeError = () => {
-      console.error('❌ [PaymentModal] Iframe failed to load');
-      setError('Gagal memuat halaman pembayaran. Silakan coba metode lain.');
-      setIsLoading(false);
-      setShowAlternateOption(true);
-    };
-
-    const handleOpenInNewTab = () => {
-      if (paymentUrl) {
-        window.open(paymentUrl, '_blank', 'noopener,noreferrer');
-        onClose();
-      }
-    };
-
-    const handleCopyPaymentUrl = () => {
-      if (paymentUrl) {
-        navigator.clipboard.writeText(paymentUrl);
-        alert('URL pembayaran telah disalin ke clipboard!');
-      }
-    };
-
-    const toggleFullscreen = () => {
-      setIsFullscreen(!isFullscreen);
-    };
-
-    const toggleViewMode = () => {
-      setViewMode(viewMode === 'desktop' ? 'mobile' : 'desktop');
-    };
-
-    return (
-      <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 ${isFullscreen ? 'z-60' : ''}`}>
-        <div className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col ${
-          isFullscreen ? 'h-[95vh] w-[95vw] max-w-none' : 'max-w-6xl h-[85vh]'
-        }`}>
-          {/* Modal Header */}
-          <div className="p-4 border-b border-gray-200 flex-shrink-0">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                  <FaLock className="text-blue-600 text-xl" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Pembayaran Aman</h3>
-                  <p className="text-sm text-gray-600">Invoice: {invoiceNumber}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                {/* View Mode Toggle */}
-                <button
-                  onClick={toggleViewMode}
-                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition"
-                  title={viewMode === 'desktop' ? 'Switch to Mobile View' : 'Switch to Desktop View'}
-                >
-                  {viewMode === 'desktop' ? <FaMobileAlt /> : <FaDesktop />}
-                </button>
-                
-                {/* Fullscreen Toggle */}
-                <button
-                  onClick={toggleFullscreen}
-                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition"
-                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-                >
-                  {isFullscreen ? <FaCompress /> : <FaExpand />}
-                </button>
-                
-                <button
-                  onClick={onClose}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition"
-                  aria-label="Tutup modal pembayaran"
-                >
-                  <FaTimes className="text-xl" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Security Info */}
-            <div className="mt-3 bg-blue-50 p-3 rounded-lg">
-              <div className="flex items-center justify-center">
-                <FaLock className="text-blue-600 mr-2" />
-                <span className="text-sm text-blue-700">
-                  Transaksi Anda aman dan terenkripsi melalui DOKU Payment Gateway
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Modal Body */}
-          <div className="flex-1 overflow-hidden flex flex-col p-4">
-            {/* Error State */}
-            {error ? (
-              <div className="flex-1 flex items-center justify-center bg-white">
-                <div className="text-center max-w-md">
-                  <FaExclamationCircle className="text-5xl text-red-500 mx-auto mb-4" />
-                  <h4 className="text-lg font-bold text-gray-900 mb-2">Gagal Memuat Pembayaran</h4>
-                  <p className="text-gray-600 mb-6">{error}</p>
-                  
-                  {showAlternateOption && (
-                    <div className="space-y-3">
-                      <button
-                        onClick={handleOpenInNewTab}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition flex items-center justify-center"
-                      >
-                        <FaExternalLinkAlt className="mr-2" />
-                        Buka di Tab Baru
-                      </button>
-                      <button
-                        onClick={handleCopyPaymentUrl}
-                        className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition"
-                      >
-                        Salin Link Pembayaran
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col relative">
-                {/* Loading Overlay */}
-                {isLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
-                    <div className="text-center">
-                      <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
-                      <p className="text-gray-600">Memuat halaman pembayaran...</p>
-                      <p className="text-sm text-gray-500 mt-2">Harap tunggu sebentar</p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Iframe Container */}
-                <div className={`flex-1 relative overflow-hidden border border-gray-200 rounded-xl ${
-                  viewMode === 'mobile' ? 'max-w-md mx-auto w-full' : 'w-full'
-                }`}>
-                  {/* View Mode Indicator */}
-                  <div className="absolute top-2 right-2 z-10">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      viewMode === 'mobile' 
-                        ? 'bg-purple-100 text-purple-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {viewMode === 'mobile' ? 'Mobile View' : 'Desktop View'}
-                    </span>
-                  </div>
-                  
-                  {/* Iframe dengan responsive styling */}
-                  <iframe
-                    ref={iframeRef}
-                    src={paymentUrl}
-                    title="Payment Gateway"
-                    className={`absolute inset-0 w-full h-full border-0 ${
-                      viewMode === 'mobile' ? 'max-w-md mx-auto' : ''
-                    }`}
-                    sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-modals"
-                    allow="payment; fullscreen; autoplay; camera; microphone"
-                    allowFullScreen
-                    onLoad={handleIframeLoad}
-                    onError={handleIframeError}
-                    style={{
-                      minHeight: '600px'
-                    }}
-                  />
-                </div>
-                
-                
-              </div>
-            )}
-          </div>
-
-          {/* Modal Footer */}
-          <div className="p-4 border-t border-gray-200 flex-shrink-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-              <div className="mb-3 sm:mb-0">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium text-blue-600">Tips:</span> Pastikan mengisi semua data dengan benar untuk proses yang lancar
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={toggleViewMode}
-                  className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition flex items-center text-sm"
-                >
-                  {viewMode === 'desktop' ? <FaMobileAlt className="mr-2" /> : <FaDesktop className="mr-2" />}
-                  {viewMode === 'desktop' ? 'Mobile View' : 'Desktop View'}
-                </button>
-                <button
-                  onClick={toggleFullscreen}
-                  className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition flex items-center text-sm"
-                >
-                  {isFullscreen ? <FaCompress className="mr-2" /> : <FaExpand className="mr-2" />}
-                  {isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen'}
-                </button>
-                <button
-                  onClick={handleOpenInNewTab}
-                  className="px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition flex items-center text-sm"
-                >
-                  <FaExternalLinkAlt className="mr-2" />
-                  Buka di Tab Baru
-                </button>
-                <button
-                  onClick={onClose}
-                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition text-sm"
-                >
-                  Tutup
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const handlePaymentModalClose = useCallback(() => {
+    setPaymentUrl(null);
+    fetchInvoiceData();
+  }, [fetchInvoiceData]);
 
   // Component untuk Success Modal
   const SuccessModal = () => {
@@ -1469,22 +1666,23 @@ const InvoicePage = () => {
         </div>
       </div>
 
-      {/* Payment Modal */}
-      {paymentUrl && (
+      {/* Payment Modal untuk Desktop */}
+      {!isMobileView && paymentUrl && (
         <PaymentModal
           invoiceNumber={invoice.invoice_number}
           paymentUrl={paymentUrl}
-          onClose={() => {
-            setPaymentUrl(null);
-            fetchInvoiceData();
-          }}
-          onPaymentSuccess={() => {
-            setPaymentUrl(null);
-            setSuccessModal({
-              show: true,
-              title: "Pembayaran Berhasil!",
-              message: "Pembayaran Anda telah berhasil diproses."
-            });
+          onClose={handlePaymentModalClose}
+        />
+      )}
+
+      {/* Mobile Redirect Dialog */}
+      {isMobileView && showMobileRedirectDialog && paymentUrl && (
+        <MobileRedirectDialog
+          paymentUrl={paymentUrl}
+          description={`Invoice: ${invoice.invoice_number}`}
+          onClose={handleMobileRedirectDialogClose}
+          onRedirect={() => {
+            console.log('Redirecting to DOKU payment page');
           }}
         />
       )}
