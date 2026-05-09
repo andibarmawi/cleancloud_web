@@ -414,6 +414,55 @@ const PaymentModal = ({ invoiceNumber, paymentUrl, onClose }) => {
   );
 };
 
+const getPickupStatusBadge = (status) => {
+  if (!status) return null;
+
+  const statusConfig = {
+    'BELUM DIAMBIL': { 
+      color: 'bg-red-100 text-red-800', 
+      icon: <FaClock className="mr-1" />,
+      bgOpacity: 'bg-red-100/20'
+    },
+    'SUDAH DIAMBIL': { 
+      color: 'bg-green-100 text-green-800', 
+      icon: <FaCheckCircle className="mr-1" />,
+      bgOpacity: 'bg-green-100/20'
+    },
+    'SEDANG PROSES': { 
+      color: 'bg-blue-100 text-blue-800', 
+      icon: <FaSpinner className="animate-spin mr-1" />,
+      bgOpacity: 'bg-blue-100/20'
+    },
+    'SIAP DIAMBIL': { 
+      color: 'bg-yellow-100 text-yellow-800', 
+      icon: <FaBell className="mr-1" />,
+      bgOpacity: 'bg-yellow-100/20'
+    },
+    'SUDAH DIKIRIM': {
+      color: 'bg-emerald-100 text-emerald-800',
+      icon: <FaTruck className="mr-1" />,
+      bgOpacity: 'bg-emerald-100/20'
+    },
+    'DALAM PENGIRIMAN': {
+      color: 'bg-purple-100 text-purple-800',
+      icon: <FaTruck className="mr-1 animate-pulse" />,
+      bgOpacity: 'bg-purple-100/20'
+    }
+  };
+  
+  const config = statusConfig[status] || { 
+    color: 'bg-gray-100 text-gray-800', 
+    icon: <FaClock className="mr-1" />,
+    bgOpacity: 'bg-gray-100/20'
+  };
+  
+  return (
+    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
+      {config.icon} {status}
+    </span>
+  );
+};
+
 const InvoicePage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -1300,11 +1349,9 @@ const InvoicePage = () => {
             <div className="mt-4 md:mt-0">
               <div className="text-right">
                 <div className="text-3xl font-bold mb-2">{formatCurrency(invoice.total)}</div>
-                <div className="flex items-center justify-end">
+                <div className="flex items-center justify-end gap-3">
                   {getPaymentStatusBadge(invoice.payment_status)}
-                  <span className="ml-3 text-sm bg-white/20 px-3 py-1 rounded-full">
-                    {invoice.pickup_status}
-                  </span>
+                  {getPickupStatusBadge(invoice.pickup_status)}
                 </div>
               </div>
             </div>
