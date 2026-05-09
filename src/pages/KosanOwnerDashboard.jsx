@@ -89,6 +89,7 @@ const KosanOwnerDashboard = () => {
         throw new Error('Token tidak ditemukan. Silakan login kembali.');
       }
 
+      //const apiUrl = import.meta.env.VITE_API_URL || 'http://172.31.208.1:8080';
       const apiUrl = import.meta.env.VITE_API_URL || 'https://api.cleancloud.cloud';
       const requestUrl = `${apiUrl}/mitra/kosan/${kosanId}/owner`;
 
@@ -245,6 +246,7 @@ const KosanOwnerDashboard = () => {
     // AUTH & URL
     // =========================
     const token = localStorage.getItem('kosan_owner_token');
+    //const apiUrl = import.meta.env.VITE_API_URL || 'http://172.31.208.1:8080';
     const apiUrl = import.meta.env.VITE_API_URL || 'https://api.cleancloud.cloud';
     const endpoint = `${apiUrl}/mitra/kosan/${kosanId}/withdraw-fee`;
 

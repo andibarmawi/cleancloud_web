@@ -29,7 +29,8 @@ import {
   FaMobileAlt,
   FaTimes,
   FaExclamationTriangle,
-  FaArrowRight
+  FaArrowRight,
+  FaTruck
 } from 'react-icons/fa';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { buildApiUrl } from "../apiConfig";
@@ -1132,7 +1133,11 @@ const CustomerDashboard = () => {
       'SIAP DIAMBIL': { 
         color: 'bg-yellow-100 text-yellow-800', 
         icon: <FaBell className="mr-1" />
-      }
+      },
+      'SUDAH DIKIRIM': {
+    color: 'bg-emerald-100 text-emerald-800',
+    icon: <FaTruck className="mr-1" />
+  }
     };
     
     const config = statusConfig[status] || { 
