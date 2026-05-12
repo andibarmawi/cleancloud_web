@@ -42,6 +42,156 @@ const WS_HEARTBEAT_INTERVAL = 30000; // 30 detik
 const WS_CONNECTION_TIMEOUT = 10000; // 10 detik
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+// Component untuk Delivery Proof Modal
+const DeliveryProofModal = ({ proof, invoice, onClose }) => {
+  const [imageError, setImageError] = useState(false);
+
+  console.log('📸 [DeliveryProofModal] Rendering with proof:', proof);
+
+  if (!proof) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mr-3">
+                <FaTruck className="text-emerald-600 text-xl" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Bukti Pengantaran</h3>
+                <p className="text-sm text-gray-600">
+                  {invoice?.invoice || invoice?.noresi || 'Invoice'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition"
+            >
+              <FaTimes className="text-xl" />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Detail Pengantaran */}
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <h4 className="font-semibold text-gray-900 mb-3">Detail Pengantaran</h4>
+            <div className="grid grid-cols-2 gap-4">
+              {proof.uploaded_at && (
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-600">Tanggal & Waktu Pengantaran</p>
+                  <p className="font-medium">
+                    {new Date(proof.uploaded_at).toLocaleDateString('id-ID', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              )}
+              {proof.driver_name && (
+                <div>
+                  <p className="text-sm text-gray-600">Kurir</p>
+                  <p className="font-medium">{proof.driver_name}</p>
+                </div>
+              )}
+              {proof.recipient_name && (
+                <div>
+                  <p className="text-sm text-gray-600">Penerima</p>
+                  <p className="font-medium">{proof.recipient_name}</p>
+                </div>
+              )}
+              {proof.recipient_phone && (
+                <div>
+                  <p className="text-sm text-gray-600">Telepon Penerima</p>
+                  <p className="font-medium">{proof.recipient_phone}</p>
+                </div>
+              )}
+              {proof.delivery_address && (
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-600">Alamat Pengantaran</p>
+                  <p className="font-medium">{proof.delivery_address}</p>
+                </div>
+              )}
+              {proof.notes && (
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-600">Catatan</p>
+                  <p className="font-medium">{proof.notes}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bukti Foto */}
+          {proof.photo_url ? (
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-3">Foto Bukti Pengantaran</h4>
+              <div className="bg-gray-100 rounded-lg overflow-hidden">
+                {!imageError ? (
+                  <img
+                    src={proof.photo_url}
+                    alt="Bukti Pengantaran"
+                    className="w-full h-auto max-h-96 object-contain cursor-pointer hover:opacity-90 transition"
+                    onClick={() => window.open(proof.photo_url, '_blank')}
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-48 bg-gray-100">
+                    <div className="text-center text-gray-500">
+                      <FaExclamationCircle className="text-3xl mx-auto mb-2" />
+                      <p>Gagal memuat gambar</p>
+                      <button
+                        onClick={() => window.open(proof.photo_url, '_blank')}
+                        className="text-blue-600 hover:underline mt-2"
+                      >
+                        Buka di tab baru
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                Klik gambar untuk memperbesar
+              </p>
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <FaTruck className="text-4xl text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600">Foto bukti pengantaran tidak tersedia</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-500">
+              Status: <span className="text-emerald-600 font-medium">SUDAH DIKIRIM</span>
+            </p>
+            <div className="flex gap-2">
+              
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Component untuk Mobile Redirect Dialog
 const MobileRedirectDialog = ({ paymentUrl, description, onClose, onRedirect }) => {
   const [countdown, setCountdown] = useState(5);
@@ -454,6 +604,11 @@ const CustomerDashboard = () => {
     unpaidCount: 0
   });
 
+  // State untuk bukti pengantaran
+  const [deliveryProof, setDeliveryProof] = useState(null);
+  const [showDeliveryProof, setShowDeliveryProof] = useState(false);
+  const [loadingDeliveryProof, setLoadingDeliveryProof] = useState(false);
+
   // WebSocket Refs
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -566,6 +721,83 @@ const CustomerDashboard = () => {
     }
   }, [customerId]);
 
+  // Fungsi untuk mengambil bukti pengantaran
+  const fetchDeliveryProof = useCallback(async (invoice) => {
+  console.group('📸 [DeliveryProof] Fetching delivery proof');
+  
+  if (!invoice) {
+    console.error('❌ Invoice is null or undefined');
+    alert('Data invoice tidak tersedia');
+    console.groupEnd();
+    return;
+  }
+
+  // Gunakan invoice_number dari data invoice
+  const invoiceNumber = invoice.invoice || invoice.noresi;
+  
+  console.log('📋 Invoice Number:', invoiceNumber);
+  
+  if (!invoiceNumber) {
+    console.error('❌ No invoice number found');
+    alert('Nomor invoice tidak tersedia');
+    console.groupEnd();
+    return;
+  }
+
+  try {
+    setLoadingDeliveryProof(true);
+    setShowDeliveryProof(true);
+
+    // Kirim invoice_number sebagai query parameter
+    const url = buildApiUrl(`/public/delivery/proof?invoice_number=${encodeURIComponent(invoiceNumber)}`);
+    
+    console.log('🌐 API URL:', url);
+
+    const response = await fetch(url);
+    console.log('📡 Response Status:', response.status);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Bukti pengantaran belum tersedia untuk invoice ini');
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ API Response:', data);
+
+    if (data.success && data.data) {
+      // Transform data untuk modal
+      const proofData = {
+        photo_url: data.data.photo_url || null,
+        thumbnail_url: data.data.thumbnail_url || null,
+        notes: data.data.notes || 'Tidak ada catatan',
+        uploaded_at: data.data.uploaded_at || null,
+        driver_name: data.data.driver_name || 'Tidak diketahui',
+        courier_name: data.data.driver_name || 'Tidak diketahui',
+        delivery_date: data.data.uploaded_at ? data.data.uploaded_at.split(' ')[0] : null,
+        delivery_time: data.data.uploaded_at ? data.data.uploaded_at.split(' ')[1] : null,
+        recipient_name: data.data.recipient_name || 'Penerima',
+        recipient_phone: data.data.recipient_phone || '',
+        delivery_address: data.data.delivery_address || 'Alamat tidak tersedia'
+      };
+      
+      console.log('📸 Transformed Proof Data:', proofData);
+      setDeliveryProof(proofData);
+      setShowDeliveryProof(true);
+    } else {
+      throw new Error(data.message || 'Gagal mengambil bukti pengantaran');
+    }
+  } catch (error) {
+    console.error('❌ Error:', error);
+    alert(error.message || 'Gagal mengambil bukti pengantaran');
+    setShowDeliveryProof(false);
+    setDeliveryProof(null);
+  } finally {
+    setLoadingDeliveryProof(false);
+    console.groupEnd();
+  }
+}, []);
   // Update ref ketika fungsi berubah
   useEffect(() => {
     fetchCustomerDataRef.current = fetchCustomerData;
@@ -1135,9 +1367,9 @@ const CustomerDashboard = () => {
         icon: <FaBell className="mr-1" />
       },
       'SUDAH DIKIRIM': {
-    color: 'bg-emerald-100 text-emerald-800',
-    icon: <FaTruck className="mr-1" />
-  }
+        color: 'bg-emerald-100 text-emerald-800',
+        icon: <FaTruck className="mr-1" />
+      }
     };
     
     const config = statusConfig[status] || { 
@@ -1664,6 +1896,20 @@ const CustomerDashboard = () => {
         </div>
       )}
 
+      {/* Delivery Proof Modal */}
+      {showDeliveryProof && deliveryProof && (
+        <DeliveryProofModal
+          proof={deliveryProof}
+          invoice={{
+            invoice: paymentConfirmModal.invoice?.invoice || customerData?.data?.invoices?.find(inv => inv.pickup_status === 'SUDAH DIKIRIM')?.invoice
+          }}
+          onClose={() => {
+            setShowDeliveryProof(false);
+            setDeliveryProof(null);
+          }}
+        />
+      )}
+
       {/* Payment Loading Overlay */}
       {paymentLoading && !paymentUrl && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -2134,6 +2380,38 @@ const CustomerDashboard = () => {
                           <FaFileInvoice className="mr-2" />
                           Detail Invoice
                         </button>
+                        
+                        {/* Tombol Lihat Bukti Pengantaran - Hanya muncul jika status SUDAH DIKIRIM */}
+                        {/* Tombol Lihat Bukti Pengantaran - Hanya muncul jika status SUDAH DIKIRIM */}
+{invoice.pickup_status === 'SUDAH DIKIRIM' && (
+  <button
+    onClick={() => {
+      console.log('🔘 [DEBUG] Button clicked for invoice:', {
+        invoice: invoice.invoice,
+        noresi: invoice.noresi,
+        pickup_status: invoice.pickup_status,
+        full_data: invoice
+      });
+      fetchDeliveryProof(invoice);
+    }}
+    disabled={loadingDeliveryProof}
+    className={`inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-lg transition shadow-lg hover:shadow-xl ${
+      loadingDeliveryProof ? 'opacity-50 cursor-not-allowed' : 'hover:from-emerald-600 hover:to-emerald-700'
+    }`}
+  >
+    {loadingDeliveryProof ? (
+      <>
+        <FaSpinner className="animate-spin mr-2" />
+        Memuat...
+      </>
+    ) : (
+      <>
+        <FaTruck className="mr-2" />
+        Lihat Bukti Pengantaran
+      </>
+    )}
+  </button>
+)}
                         
                         {invoice.status === 'UNPAID' && (
                           <button
