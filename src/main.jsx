@@ -10,7 +10,7 @@ import KosanOwnerDashboard from './pages/KosanOwnerDashboard';
 import KosanOwnerLogin from './pages/KosanOwnerLogin';
 import ProtectedRoute from './components/ProtectedRoute';
 import MitraLandingPage from './pages/MitraLandingPage';
-//import RegistrationSuccess from './pages/RegistrationSuccess'
+import SortirCheckPublic from './pages/SortirCheckPublic'; // ✅ IMPORT HALAMAN BARU
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -25,10 +25,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/mitra/:kosanId" element={<CustomersPage />} />
           <Route path="/mitra/landing" element={<MitraLandingPage />} />
-          {/*<Route path="/pendaftaran-berhasil" element={<RegistrationSuccess />} />
-          */}
+          
           {/* Kosan Owner Login (Public) */}
           <Route path="/kosan-owner/login" element={<KosanOwnerLogin />} />
+          
+          {/* ✅ GANTI: SortirCheckPublic (dengan tabs Sortir Awal & Akhir) */}
+          <Route path="/sortir-check" element={<SortirCheckPublic />} />
           
           {/* Kosan Owner Dashboard (Protected) */}
           <Route 
@@ -39,7 +41,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               </ProtectedRoute>
             }
           />
-
           
           {/* 404 Route */}
           <Route path="*" element={
