@@ -24,7 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/customer/:customerId" element={<CustomerDashboard />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/mitra/:kosanId" element={<CustomersPage />} />
-          <Route path="/mitra/landing" element={<MitraLandingPage />} />
+          <Route path="/mitra/sangkuringlaundry" element={<MitraLandingPage />} />
           
           {/* Kosan Owner Login (Public) */}
           <Route path="/kosan-owner/login" element={<KosanOwnerLogin />} />
